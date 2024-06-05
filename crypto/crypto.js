@@ -1,23 +1,29 @@
 const CryptoJS = require('crypto-js');
 const { json } = require('express');
 
-const Encryption = async (id) => {
-    try {
-      if(typeof id == "object"){
-        id =  JSON.stringify(id)
-      }
-      return CryptoJS.AES.encrypt(id, process.env.cryptoSecretKey).toString();
-    } catch (er) {
-      console.error(er);
-    }
-  }
+const Encryption = async (plainText , secret) => {
+  let _key = CryptoJS.enc.Utf8.parse(secret);
+  let _iv = CryptoJS.enc.Utf8.parse(secret);
+  let encrypted = CryptoJS.AES.encrypt(JSON.stringify(plainText), _key, {
+    keySize: 16,
+    iv: _iv,
+    mode: CryptoJS.mode.ECB,
+    padding: CryptoJS.pad.Pkcs7,
+  });
+  encrypted = encrypted.toString();
+  return encrypted;
+};
   
-  const Decryption = async (data) => {
-    try {
-      const bytes = CryptoJS.AES.decrypt(data, process.env.cryptoSecretKey);
-      return bytes.toString(CryptoJS.enc.Utf8);
-    } catch (er) {
-      console.error(er);
-    }
-  }
+  const Decryption = async (strToDecrypt , secret) => {
+    let _key = CryptoJS.enc.Utf8.parse(secret);
+    let _iv = CryptoJS.enc.Utf8.parse(secret);
+    let decrypted = CryptoJS.AES.decrypt(strToDecrypt, _key, {
+      keySize: 16,
+      iv: _iv,
+      mode: CryptoJS.mode.ECB,
+      padding: CryptoJS.pad.Pkcs7,
+    }).toString(CryptoJS.enc.Utf8);
+    return JSON.parse(decrypted);
+  };
   module.exports = {Encryption , Decryption}
+

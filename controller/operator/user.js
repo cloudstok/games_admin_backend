@@ -1,11 +1,12 @@
+const { Encryption } = require("../../crypto/crypto");
 const { read, write } = require("../../db_config/db");
-
+const axios = require('axios'); 
 const addUser = async (req, res) => {
     try {
         const { operator_id, name, currency_preference, profile_url } = req.body;
         const {userId, password}= generateRandomString(name, 10);
-        const sql = "insert into user (name, user_id , password , profile_url, currency_prefrence) values(?, ?, ? , ?, ?)"
-        await write.query(sql, [name, userId, password, profile_url,  currency_preference]);
+        const sql = "insert into user (name, user_id , password , operator_id, currency_prefrence) values(?, ?, ? , ?, ?)"
+        await write.query(sql, [name, userId, password, operator_id,  currency_preference]);
         return res.status(200).send({ status: true, msg: "User created successfully", data: {name, userId, password, profile_url,  currency_preference} })
     } catch (err) {
         console.error(err);
@@ -28,9 +29,25 @@ function generateRandomString(name, length) {
         const { userId, password} = req.body;
         const [getUser] = write.query(`SELECT * FROM user WHERE user_id = ?`, [userId]);
         if(getUser.length > 0){
-            const {user_id, name, profile_url, currency_preference} = getUser[0];
+            const {user_id, name, profile_url, currency_preference ,operator_id} = getUser[0];
             const reqTime = Date.now();
+        const [getOPerator] = write.query(`SELECT * FROM operator WHERE user_id = ?`, [operator_id]);
+        const {pub_key , secret} = getOPerator[0];
 
+        const url = 'http://localhost:5000'
+
+       axios.get(url)
+          .then(response => {
+            // Handle success
+            console.log(response.data);
+          })
+          .catch(error => {
+            // Handle error
+            console.error('Error fetching data:', error);
+          });
+
+      
+             const Encryption = await Encryption( {user_id, name, profile_url, currency_preference ,operator_id} , secret)
         }else{
             return res.status(400).send({ status: false, msg: "User does not exists"});
         }
@@ -71,4 +88,4 @@ function generateRandomString(name, length) {
 
 
 
-module.exports = { addUser }
+module.exports = { addUser , userLogin }

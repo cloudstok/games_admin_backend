@@ -4,6 +4,8 @@ use `games_admin`;
 
 CREATE TABLE `user` (
    id int NOT NULL AUTO_INCREMENT,
+
+   operator_id varchar(255) not null,
    name varchar(60) not null,
    user_id varchar(255) unique NOT NULL,
    password varchar(255) NOT NULL,
