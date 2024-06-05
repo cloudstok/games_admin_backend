@@ -1,9 +1,9 @@
 const bcrypt = require("bcrypt");
-    async function hashPassword(password ){
+    const hashPassword = async(password )=>{
         try{
             return await bcrypt.hash(password, 10)
-        }catch{er}{
-            console.error(er);
+        }catch(err){
+            console.error(err);
         }
     }
     async function compare (Password  , hashPassword ){
