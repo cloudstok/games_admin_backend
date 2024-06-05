@@ -1,1 +1,2 @@
-# games_admin_backend
+# game-admin
+Game control management 
