@@ -45,7 +45,7 @@ CREATE TABLE `games_master_list` (
 
 CREATE TABLE `user_wallet` (
 	id int not null AUTO_INCREMENT,
-    user_id int not null,
+    user_id varchar(11) not null,
     balance varchar(11) not null,
     is_active boolean default true,
     created_at timestamp NULL DEFAULT CURRENT_TIMESTAMP,
