@@ -16,7 +16,6 @@ const encryption = async (plainText , secret) => {
   
 
   const decryption = async (strToDecrypt , secret) => {
-    console.log(strToDecrypt, "str" ,secret, "Secret")
     let _key = CryptoJS.enc.Utf8.parse(secret);
     let _iv = CryptoJS.enc.Utf8.parse(secret);
     let decrypted = CryptoJS.AES.decrypt(strToDecrypt, _key, {

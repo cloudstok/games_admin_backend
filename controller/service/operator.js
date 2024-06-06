@@ -33,7 +33,7 @@ const register = async (req, res) => {
     const { name } = req.body;
     const [data] = await read.query("SELECT * FROM operator where name = ?", [name]);
     if (data.length > 0) {
-      return res.status(200).send({ status: false, msg: "Operator already registered" })
+      return res.status(200).send({ status: false, msg: "Operator already registered with this name" });
     } else {
       const userId = await generateRandomUserId(name);
       let randomNumbers = await generateRandomString(54);
@@ -61,15 +61,14 @@ const userLogin = async(req, res) => {
     let {data} = req.body;
     const [getOperator] = await write.query(`SELECT * FROM operator WHERE pub_key = ?`, [id]);
     if(getOperator.length > 0){
-      const {secret} = getOperator[0];
+      const {user_id, pub_key, secret} = getOperator[0];
       const decodeData = await decryption(data, secret);
       let timeDifference = (Date.now() - decodeData.reqTime) / 1000;
       if(timeDifference > 5){
         return res.status(400).send({ status: false, msg: "Request timed out"});
       } 
-      console.log(decodeData)
       const token = await generateUUID();
-      await setRedis("token" ,  {getOperator ,decodeData}, 100)
+      await setRedis(token,  JSON.stringify({userId: decodeData.user_id, operatorId: user_id,  pub_key, secret}), 10000)
       return res.status(200).send({ status: true, msg: "User authenticated", token})
     }else{
       return res.status(400).send({ status: false, msg: "Request initiated for Invalid Operator"});

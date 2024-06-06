@@ -1,5 +1,6 @@
 const { read, write } = require("../../db_config/db");
 
+
 const serviceAddGame = async (req ,res)=>{
     try{
         const {name, url} = req.body
@@ -23,6 +24,5 @@ const serviceFindGame = async (req ,res)=>{
 }
 
 
-
-module.exports = {serviceFindGame , serviceAddGame}
+module.exports = {serviceAddGame , serviceFindGame}
 
