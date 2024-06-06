@@ -56,16 +56,17 @@ const register = async (req, res) => {
 
 const userLogin = async(req, res) => {
   try{
-    let { id, data} = req.query;
-    data = data.replaceAll('_', '+');
+    let { id} = req.params;
+    let {data} = req.body;
     const [getOperator] = await write.query(`SELECT * FROM operator WHERE pub_key = ?`, [id]);
     if(getOperator.length > 0){
       const {secret} = getOperator[0];
-      const {reqTime} = await decryption(data, secret);
-      let timeDifference = (Date.now() - reqTime) / 1000;
+      const decodeData = await decryption(data, secret);
+      let timeDifference = (Date.now() - decodeData.reqTime) / 1000;
       if(timeDifference > 5){
         return res.status(400).send({ status: false, msg: "Request timed out"});
-      }
+      } 
+      console.log(decodeData)
       const token = await generateUUID();
       return res.status(200).send({ status: true, msg: "User authenticated", token})
     }else{

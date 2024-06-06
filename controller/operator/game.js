@@ -13,7 +13,7 @@ const addGame = async (req ,res)=>{
 }
 const findGame = async (req ,res)=>{
     try{
-    const [data]=  await write.query("select * from games_list")
+    const [data]=  await write.query("select * from games_master_list")
         return res.status(200).send({ status: true, data })
     }catch(er){
         console.log(er)
