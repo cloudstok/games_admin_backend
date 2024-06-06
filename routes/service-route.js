@@ -8,7 +8,6 @@ const serviceRouter = require('express').Router();
 
 serviceRouter.post('/create/operator', register);
 serviceRouter.post('/operator/login', login);
-
 serviceRouter.post('/user/login/:id' , userLogin)
 serviceRouter.post('/game' , serviceAddGame)
 serviceRouter.get('/game' , serviceFindGame)
