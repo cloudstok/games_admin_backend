@@ -8,7 +8,6 @@ const serviceAddGame = async (req ,res)=>{
     }catch(err){
         console.log(err)
         return res.status(500).json({ msg: "Internal server Error", status: false })
-
     }
 }
 const serviceFindGame = async (req ,res)=>{
@@ -18,7 +17,6 @@ const serviceFindGame = async (req ,res)=>{
     }catch(er){
         console.log(er)
         return res.status(500).json({ msg: "Internal server Error", status: false })
-
     }
 }
 
