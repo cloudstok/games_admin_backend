@@ -34,14 +34,17 @@ const userLogin = async (req, res) => {
             }
             const { user_id, name, profile_url, currency_prefrence } = getUser[0];
             const reqTime = Date.now();
-            let encryptedData = (await encryption({ user_id, name, profile_url, currency_prefrence, reqTime }, secret))?.replaceAll('+', '_');
+            let encryptedData = await encryption({ user_id, name, profile_url, currency_prefrence, reqTime }, secret);
             const {service_provider_url} = process.env;
             //logging into service provider
             const options = {
                 method: 'POST',
-                url: `${service_provider_url}/service/user/login?id=${pub_key}&data=${encryptedData}`,
+                url: `${service_provider_url}/service/user/login/${encodeURIComponent(pub_key)}`,
                 headers: {
                     'Content-Type': 'application/json'
+                },
+                data: {
+                   data: encryptedData
                 }
             };
             await axios(options).then(data=>{
