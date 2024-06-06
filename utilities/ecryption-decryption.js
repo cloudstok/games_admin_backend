@@ -1,7 +1,7 @@
 const CryptoJS = require('crypto-js');
 const { json } = require('express');
 
-const Encryption = async (plainText , secret) => {
+const encryption = async (plainText , secret) => {
   let _key = CryptoJS.enc.Utf8.parse(secret);
   let _iv = CryptoJS.enc.Utf8.parse(secret);
   let encrypted = CryptoJS.AES.encrypt(JSON.stringify(plainText), _key, {
@@ -14,7 +14,9 @@ const Encryption = async (plainText , secret) => {
   return encrypted;
 };
   
-  const Decryption = async (strToDecrypt , secret) => {
+
+  const decryption = async (strToDecrypt , secret) => {
+    console.log(strToDecrypt, "str" ,secret, "Secret")
     let _key = CryptoJS.enc.Utf8.parse(secret);
     let _iv = CryptoJS.enc.Utf8.parse(secret);
     let decrypted = CryptoJS.AES.decrypt(strToDecrypt, _key, {
@@ -25,5 +27,5 @@ const Encryption = async (plainText , secret) => {
     }).toString(CryptoJS.enc.Utf8);
     return JSON.parse(decrypted);
   };
-  module.exports = {Encryption , Decryption}
+  module.exports = {encryption , decryption}
 

@@ -1,11 +1,13 @@
 const { addGame, findGame } = require('../controller/operator/game');
 const { addUser} = require('../controller/operator/user');
+const { register, login, userLogin } = require('../controller/service/operator');
 
 const serviceRouter = require('express').Router();
 
-// serviceRouter.post('/create/user', addUser);
+serviceRouter.post('/create/operator', register);
+serviceRouter.post('/operator/login', login);
 serviceRouter.post('/game' , addGame)
-// serviceRouter.get('/game' , findGame)
+serviceRouter.post('/user/login' , userLogin)
 
 
 module.exports = { serviceRouter};

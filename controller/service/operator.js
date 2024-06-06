@@ -1,25 +1,27 @@
 
-const { compare, hashPassword } = require('../../bcrypt/bcrypt')
+const { compare, hashPassword } = require('../../utilities/bcrypt/bcrypt')
 const { read ,write } = require('../../db_config/db')
-const { generateToken } = require('../../jwt/jsonwebtoken')
+const { generateToken } = require('../../utilities/jwt/jsonwebtoken')
+const { generateRandomString, generateRandomUserId, generateUUID } = require('../../utilities/common_function')
+const { decryption } = require('../../utilities/ecryption-decryption')
 
 const login = async (req, res) => {
   try {
-    const { user_id , password } = req.body
-    const [data] = await read.query("SELECT user_id , password  FROM operator where user_id = ?", [user_id])
+    const { userId , password } = req.body
+    const [data] = await read.query("SELECT id, user_id, password, pub_key, secret  FROM operator where user_id = ?", [userId])
     if (data.length > 0) {
       const checkPassword = await compare(password, data[0].password)
 
       if (!checkPassword) {
         return res.status(401).json({ status: false, msg: "Missing or Incorrect Credentials" });
       }
-      const Token = await generateToken(data[0], res)
-      return res.status(200).send({ status: true, Token,  role : data[0].role })
+      const token = await generateToken(data[0], res)
+      return res.status(200).send({ status: true, msg: "Operator logged in..", token})
     } else {
-      return res.status(404).json({ status: false, msg: "USER NOT EXIST" })
+      return res.status(404).json({ status: false, msg: "Operator does not exists" })
     }
-  } catch (er) {
-    return res.status(500).json({ msg: "Internal server Error", status: false, ERROR: er })
+  } catch (error) {
+    return res.status(500).json({ msg: "Internal server Error", status: false })
   }
 }
 
@@ -27,40 +29,55 @@ const login = async (req, res) => {
 
 const register = async (req, res) => {
   try {
-    const { user_id, password } = req.body;
-    const [data] = await read.query("SELECT user_id , password FROM operator where user_id = ?", [user_id])
+    const { name } = req.body;
+    const [data] = await read.query("SELECT * FROM operator where name = ?", [name]);
     if (data.length > 0) {
-      return res.status(200).send({ status: false, msg: "USER ALREADY EXIST" })
+      return res.status(200).send({ status: false, msg: "Operator already registered" })
     } else {
-      const hash = await hashPassword(password)
-
-
-     const secret_key =   generateRandomString(32)
-     const pub_key =   generateRandomString(12)
-
-     console.log({secret_key , pub_key})
-      await write.query("INSERT INTO operator(user_id, password  , pub_key,  secret) VALUES (?, ? , ?, ?)", [user_id, hash , pub_key , secret_key])
-      return res.status(200).send({ status: true, msg: "OPERATOR REGISTERED SUCCESSFULLY" })
+      const userId = await generateRandomUserId(name);
+      let randomNumbers = await generateRandomString(54);
+      let breakPoints = [10, 32, 12]
+      let parts = [];
+      let initialPos = 0;
+      breakPoints.forEach(len=> {
+        parts.push(randomNumbers.substr(initialPos, len));
+        initialPos += len
+      });
+      const [password, secret_key, pub_key] = parts;
+      const hashedPassword = await hashPassword(password);
+     await write.query("INSERT INTO operator (name, user_id, password, pub_key, secret) VALUES (?,?,?,?,?)", [name, userId, hashedPassword , pub_key , secret_key])
+     return res.status(200).send({ status: true, msg: "Operator registered successfully", data: { name, userId, password , pub_key , secret_key} });
     }
-  } catch (er) {
-    console.log(er)
-    return res.status(400).send({ status: false, Error: er })
+  } catch (error) {
+    console.log(error)
+    return res.status(500).send({ status: false, msg: "Internal Server error" });
+  }
+}
+
+const userLogin = async(req, res) => {
+  try{
+    let { id, data} = req.query;
+    data = data.replaceAll('_', '+');
+    const [getOperator] = await write.query(`SELECT * FROM operator WHERE pub_key = ?`, [id]);
+    if(getOperator.length > 0){
+      const {secret} = getOperator[0];
+      const {reqTime} = await decryption(data, secret);
+      let timeDifference = (Date.now() - reqTime) / 1000;
+      if(timeDifference > 5){
+        return res.status(400).send({ status: false, msg: "Request timed out"});
+      }
+      const token = await generateUUID();
+      return res.status(200).send({ status: true, msg: "User authenticated", token})
+    }else{
+      return res.status(400).send({ status: false, msg: "Request initiated for Invalid Operator"});
+    }
+  } catch (error) {
+    console.log(error)
+    return res.status(500).send({ status: false, msg: "Internal Server error" });
   }
 }
 
 
 
-
-function generateRandomString(length) {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()";
-  let password = "";
-  for (let i = 0; i < length; i++) {
-    password += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return password;
-}
-
-
-
-module.exports = { login, register }
+module.exports = { login, register, userLogin }
 

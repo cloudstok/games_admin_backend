@@ -4,7 +4,6 @@ use `games_admin`;
 
 CREATE TABLE `user` (
    id int NOT NULL AUTO_INCREMENT,
-
    operator_id varchar(255) not null,
    name varchar(60) not null,
    user_id varchar(255) unique NOT NULL,
@@ -21,7 +20,8 @@ CREATE TABLE `user` (
 
 CREATE TABLE `operator` (
    id int NOT NULL AUTO_INCREMENT,
-   user_id varchar(255) unique NOT NULL,
+   name varchar(60) unique not null,
+   user_id varchar(60) not null,
    password varchar(255) NOT NULL,
    profile_url varchar(255) DEFAULT NULL,
    pub_key varchar(60) NOT NULL,
@@ -32,10 +32,11 @@ CREATE TABLE `operator` (
    PRIMARY KEY (id)
 ) ENGINE = InnoDB AUTO_INCREMENT = 2 DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
 
-CREATE TABLE `games_list` (
+CREATE TABLE `games_master_list` (
 	game_id int not null AUTO_INCREMENT,
     name varchar(60) unique not null,
     url varchar(255) unique not null,
+    image varchar(255) default null,
     is_active boolean default true,
 	created_at timestamp NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
