@@ -2,7 +2,7 @@
 const { register, login, userLogin } = require('../controller/service/operator');
 const {  serviceAddGame, serviceFindGame } = require('../controller/service/game');
 const { addGame, findGame } = require('../controller/operator/game');
-const { getUserBalance } = require('../controller/service/wallet');
+const { getUserBalance, updateUserBalance } = require('../controller/service/wallet');
 
 const serviceRouter = require('express').Router();
 
@@ -14,5 +14,5 @@ serviceRouter.get('/game' , serviceFindGame)
 serviceRouter.post('/operator/game' , addGame)
 serviceRouter.get('/operator/game' , findGame)
 serviceRouter.post('/operator/user/balance', getUserBalance);
-
+serviceRouter.put('/operator/user/balance', updateUserBalance);
 module.exports = { serviceRouter};
