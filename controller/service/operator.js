@@ -4,6 +4,7 @@ const { read ,write } = require('../../db_config/db')
 const { generateToken } = require('../../utilities/jwt/jsonwebtoken')
 const { generateRandomString, generateRandomUserId, generateUUID } = require('../../utilities/common_function')
 const { decryption } = require('../../utilities/ecryption-decryption')
+const { setRedis } = require('../../redis/connection')
 
 const login = async (req, res) => {
   try {
@@ -56,7 +57,7 @@ const register = async (req, res) => {
 
 const userLogin = async(req, res) => {
   try{
-    let { id, data} = req.query;
+    let { id, data} = req.body;
     data = data.replaceAll('_', '+');
     const [getOperator] = await write.query(`SELECT * FROM operator WHERE pub_key = ?`, [id]);
     if(getOperator.length > 0){
@@ -67,6 +68,8 @@ const userLogin = async(req, res) => {
         return res.status(400).send({ status: false, msg: "Request timed out"});
       }
       const token = await generateUUID();
+
+      await setRedis("token" ,  {getOperator , secret , timeDifference }, 100)
       return res.status(200).send({ status: true, msg: "User authenticated", token})
     }else{
       return res.status(400).send({ status: false, msg: "Request initiated for Invalid Operator"});
