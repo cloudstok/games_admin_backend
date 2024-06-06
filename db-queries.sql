@@ -1,4 +1,4 @@
--- drop database if exists `games_admin`;
+ drop database if exists `games_admin`;
 create database if not exists `games_admin`;
 use `games_admin`;
 
@@ -52,3 +52,17 @@ CREATE TABLE `user_wallet` (
     updated_at timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id)
 )  ENGINE = InnoDB AUTO_INCREMENT = 2 DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
+
+
+CREATE TABLE `operator_games` (
+	id int not null AUTO_INCREMENT,
+    game_id int not null ,
+    operator_id varchar(255) not null,
+    name varchar(60) unique not null,
+    url varchar(255) unique not null,
+    image varchar(255) default null,
+    is_active boolean default true,
+	created_at timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+   PRIMARY KEY (id)
+) ENGINE = InnoDB AUTO_INCREMENT = 2 DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;

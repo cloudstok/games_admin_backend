@@ -69,8 +69,7 @@ const userLogin = async(req, res) => {
       } 
       console.log(decodeData)
       const token = await generateUUID();
-
-      await setRedis("token" ,  {getOperator , secret , timeDifference }, 100)
+      await setRedis("token" ,  {getOperator ,decodeData}, 100)
       return res.status(200).send({ status: true, msg: "User authenticated", token})
     }else{
       return res.status(400).send({ status: false, msg: "Request initiated for Invalid Operator"});
