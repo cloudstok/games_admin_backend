@@ -56,5 +56,35 @@ const getGameFromServiceProvider = async(req, res)=> {
     }
 }
 
+const operatorFindGame = async (req, res) => {
+    try {
+        const { token } = req.headers;
+        const url = process.env.service_base_url;
+        let config = {
+            method: 'GET',
+            url: `${url}/service/operator/game`,
+            headers: {
+                token
+            }
+        };
 
-module.exports = {addGame , findGame , getGameFromServiceProvider}
+        await axios(config).then(data=>{
+            if(data.status === 200){
+                return res.status(200).send({ status: true, msg: "games list fetched successfully", data: data.data});
+            }else{
+                console.log(`received an invalid response from upstream server`);
+                return res.status(data.status).send({ status: false, msg:`Request failed from upstream server with response:: ${JSON.stringify(data)}` })
+            }
+        }).catch(err=>{
+            console.error(`[ERR] while getting games from service operator is::`, JSON.stringify(err))
+            return res.status(500).send({ status: false, msg: "We've encountered an internal error" });
+        })
+
+
+    } catch (er) {
+        console.log(er)
+        return res.status(500).json({ msg: "Internal server Error", status: false })
+    }
+}
+
+module.exports = {addGame , findGame , getGameFromServiceProvider, operatorFindGame}
