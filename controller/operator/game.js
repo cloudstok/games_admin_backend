@@ -1,20 +1,25 @@
 
+const { default: axios } = require("axios");
 const { read, write } = require("../../db_config/db");
 const { getRedis } = require("../../redis/connection");
 
 
+
+
 const addGame = async (req ,res)=>{
     try{
-        const { operator_id , game_id } = req.body
-       await write.query("insert into operator_games (operator_id , game_id) value(? , ?)" , [operator_id , game_id])
-       return res.status(200).send({ status: true, msg: "Game onboarded successfully for operator" });
+        const {name, url} = req.body
+       await write.query("insert into games_master_list (name , url ) value(? , ?)" , [name , url])
+       return res.status(200).send({ status: true, msg: "games Add successfully to master's list" })
     }catch(err){
         console.log(err)
         return res.status(500).json({ msg: "Internal server Error", status: false })
     }
 }
+
 const findGame = async (req ,res)=>{
     try{
+
     let token = req.headers.token;
     let validateUser = await getRedis(token);
     try{
@@ -36,5 +41,20 @@ const findGame = async (req ,res)=>{
 }
 
 
+const getGameFromServiceProvider = async(req, res)=> {
+    try{
+        const { token } = req.headers;
+   let data = await axios.get('localhost:4000/operator/game' ,{headers : {
+        "token" : token
+    }})
 
-module.exports = {addGame , findGame}
+    console.log(data)
+        
+    }catch(er){
+        console.log(er)
+        return res.status(500).json({ msg: "Internal server Error", status: false })
+    }
+}
+
+
+module.exports = {addGame , findGame , getGameFromServiceProvider}

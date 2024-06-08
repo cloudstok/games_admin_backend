@@ -13,9 +13,9 @@ const addWallet = async (req ,res)=>{
 }
 const findWallet = async (req ,res)=>{
     try{
-        const {user_id} = req.body
-     const {} =  await decryption(data , pub_key)
-    const [data]=  await write.query("select * from user_wallet user_id = ? " , [req.query.user_id])
+        const {user_id} = req.params
+    //  const {} =  await decryption(data , pub_key)
+    const [data]=  await write.query("select * from user_wallet user_id = ? " , [user_id])
         return res.status(200).send({ status: true, data })
     }catch(er){
         console.log(er)

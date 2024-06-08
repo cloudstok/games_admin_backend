@@ -24,6 +24,7 @@ const addUser = async (req, res) => {
 
 const userLogin = async (req, res) => {
     try {
+        
         const { pub_key, secret } = req.operator.user;
         const { userId, password } = req.body;
         const [getUser] = await write.query(`SELECT * FROM user WHERE user_id = ?`, [userId]);
@@ -36,6 +37,7 @@ const userLogin = async (req, res) => {
             const reqTime = Date.now();
             let encryptedData = await encryption({ user_id, name, profile_url, currency_prefrence, reqTime }, secret);
             const {service_provider_url} = process.env;
+            console.log(service_provider_url)
             //logging into service provider
             const options = {
                 method: 'POST',
