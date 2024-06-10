@@ -5,7 +5,7 @@ const { addWallet, findWallet, userBalance, updateBalance } = require('../contro
 const { operatorFindGame } = require('../controller/operator/game');
 const operatorRouter = require('express').Router();
 operatorRouter.post('/create/user', verifyToken, addUser);
-operatorRouter.post('/user/login', verifyToken, userLogin)
+operatorRouter.post('/user/login', userLogin)
 operatorRouter.post('/game' , serviceAddGame)
 operatorRouter.post('/wallet' , addWallet)
 operatorRouter.get('/wallet/:user_id' , findWallet)

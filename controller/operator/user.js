@@ -25,7 +25,9 @@ const addUser = async (req, res) => {
 const userLogin = async (req, res) => {
     try {
         
-        const { pub_key, secret } = req.operator.user;
+        // const { pub_key, secret } = req.operator.user;
+        const [getOperator] = await write.query(`SELECT * FROM operator WHERE user_type = 'operator' and is_deleted = 0 LIMIT 1`);
+        const { pub_key, secret } = getOperator[0];
         const { userId, password } = req.body;
         const [getUser] = await write.query(`SELECT * FROM user WHERE user_id = ?`, [userId]);
         if (getUser.length > 0) {
