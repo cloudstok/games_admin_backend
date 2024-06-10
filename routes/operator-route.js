@@ -1,5 +1,5 @@
 const { serviceAddGame, serviceFindGame } = require('../controller/service/game');
-const { addUser, userLogin} = require('../controller/operator/user');
+const { addUser, userLogin, getUser} = require('../controller/operator/user');
 const { verifyToken } = require('../utilities/jwt/jsonwebtoken');
 const { addWallet, findWallet, userBalance, updateBalance } = require('../controller/operator/wallet');
 const { operatorFindGame } = require('../controller/operator/game');
@@ -12,5 +12,6 @@ operatorRouter.get('/wallet/:user_id' , findWallet)
 operatorRouter.post('/user/balance/:operator_id', userBalance);
 operatorRouter.put('/user/balance/:operator_id', updateBalance);
 operatorRouter.get('/games/list', operatorFindGame);
+operatorRouter.get('/user/list', getUser);
 
 module.exports = { operatorRouter};

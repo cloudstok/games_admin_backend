@@ -73,7 +73,7 @@ const userLogin = async (req, res) => {
 
 const getUser = async (req, res) => {
     try {
-        const sql = "SELECT * FROM user_profile where is_deleted = 1"
+        const sql = "SELECT * FROM user where is_deleted = 0"
         const [data] = await read.query(sql)
         return res.status(200).send({ status: true, msg: "Find data", data })
     } catch (er) {
@@ -101,4 +101,4 @@ const updateUser = async (req, res) => {
 
 
 
-module.exports = { addUser, userLogin }
+module.exports = { addUser, userLogin , getUser }
