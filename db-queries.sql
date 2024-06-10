@@ -63,3 +63,8 @@ CREATE TABLE `operator_games` (
     updated_at timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
    PRIMARY KEY (id)
 ) ENGINE = InnoDB AUTO_INCREMENT = 2 DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
+
+
+ALTER TABLE `operator` ADD COLUMN `user_type` ENUM('admin', 'operator') NOT NULL DEFAULT 'operator' AFTER `secret`;
+
+INSERT INTO operator (`name`, `user_id`, `password`, `pub_key`, `secret`, `user_type`) values('cloudstok', 'cloudstok_6655', '$2b$10$GZeHWlklKMCtMMfzHtdaU.CjqfhXIN4AMUh1X7tAduxjUohSxIXM2', '1l3s!i)AajTz', 'GiJZHWZbal(roHzEbb%TJa(^BD02xHRg', 'admin'); 

@@ -9,7 +9,7 @@ const { setRedis } = require('../../redis/connection')
 const login = async (req, res) => {
   try {
     const { userId , password } = req.body
-    const [data] = await read.query("SELECT id, user_id, password, pub_key, secret  FROM operator where user_id = ?", [userId])
+    const [data] = await read.query("SELECT id, user_id, password, pub_key, secret, user_type  FROM operator where user_id = ?", [userId])
     if (data.length > 0) {
       const checkPassword = await compare(password, data[0].password)
 
@@ -30,24 +30,43 @@ const login = async (req, res) => {
 
 const register = async (req, res) => {
   try {
-    const { name } = req.body;
-    const [data] = await read.query("SELECT * FROM operator where name = ?", [name]);
-    if (data.length > 0) {
-      return res.status(200).send({ status: false, msg: "Operator already registered with this name" });
-    } else {
-      const userId = await generateRandomUserId(name);
-      let randomNumbers = await generateRandomString(54);
-      let breakPoints = [10, 32, 12]
-      let parts = [];
-      let initialPos = 0;
-      breakPoints.forEach(len=> {
-        parts.push(randomNumbers.substr(initialPos, len));
-        initialPos += len
-      });
-      const [password, secret_key, pub_key] = parts;
-      const hashedPassword = await hashPassword(password);
-     await write.query("INSERT INTO operator (name, user_id, password, pub_key, secret) VALUES (?,?,?,?,?)", [name, userId, hashedPassword , pub_key , secret_key])
-     return res.status(200).send({ status: true, msg: "Operator registered successfully", data: { name, userId, password , pub_key , secret_key} });
+    if(req.operator?.user?.user_type === 'admin'){
+      const { name, user_type } = req.body;
+      const [data] = await read.query("SELECT * FROM operator where name = ?", [name]);
+      if (data.length > 0) {
+        return res.status(200).send({ status: false, msg: "Operator already registered with this name" });
+      } else {
+        const userId = await generateRandomUserId(name);
+        let randomNumbers = await generateRandomString(54);
+        let breakPoints = [10, 32, 12]
+        let parts = [];
+        let initialPos = 0;
+        breakPoints.forEach(len=> {
+          parts.push(randomNumbers.substr(initialPos, len));
+          initialPos += len
+        });
+        const [password, secret_key, pub_key] = parts;
+        const hashedPassword = await hashPassword(password);
+        let userType = user_type ? user_type : 'operator';
+        await write.query("INSERT INTO operator (name, user_id, password, pub_key, secret, user_type) VALUES (?,?,?,?,?, ?)", [name, userId, hashedPassword , pub_key , secret_key, userType]);   
+       return res.status(200).send({ status: true, msg: "Operator registered successfully", data: { name, userId, password , pub_key , secret_key, user_type} });
+      }
+    }else{
+      return res.status(400).send({ status: false, msg: "User not authorized to perform the operation"});
+    }
+  } catch (error) {
+    console.log(error)
+    return res.status(500).send({ status: false, msg: "Internal Server error" });
+  }
+}
+
+const getOperatorList = async(req, res) => {
+  try{
+    if(req.operator?.user?.user_type === 'admin'){
+      const [operatorList] = await write.query(`SELECT  * FROM operator where user_type = 'operator' and is_deleted = 0`);
+      return res.status(200).send({ status: true, msg: "Operators list fetched successfully", data: operatorList});
+    }else{
+      return res.status(400).send({ status: false, msg: "User not authorized to perform the operation"});
     }
   } catch (error) {
     console.log(error)
@@ -81,5 +100,5 @@ const userLogin = async(req, res) => {
 
 
 
-module.exports = { login, register, userLogin }
+module.exports = { login, register, userLogin, getOperatorList }
 
