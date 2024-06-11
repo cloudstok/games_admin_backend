@@ -66,7 +66,7 @@ const getGameFromServiceProvider = async (req, res) => {
 const operatorFindGame = async (req, res) => {
     try {
         const { token } = req.headers;
-        const url = process.env.service_base_url;
+        const url = process.env.service_provider_url;
         let config = {
             method: 'GET',
             url: `${url}/service/operator/game`,

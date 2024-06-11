@@ -5,7 +5,9 @@ const getOperatorGame = async(req, res)=> {
     try{
         let token = req.headers.token;
         let validateUser = await getRedis(token);
+       
         validateUser = JSON.parse(validateUser)
+        console.log(validateUser)
         if (validateUser) {
             const {operatorId} = validateUser
             const [gamesList] = await write.query(`SELECT * FROM operator_games as og INNER JOIN games_master_list as gml on gml.game_id = og.game_id WHERE operator_id = ?`, [operatorId]);
