@@ -1,15 +1,15 @@
 const { read, write } = require("../../db_config/db");
 const { getRedis } = require("../../redis/connection");
 
-const getOperatorGame = async(req, res)=> {
-    try{
+const getOperatorGame = async (req, res) => {
+    try {
         let token = req.headers.token;
         let validateUser = await getRedis(token);
-       
+
         validateUser = JSON.parse(validateUser)
         console.log(validateUser)
         if (validateUser) {
-            const {operatorId} = validateUser
+            const { operatorId } = validateUser
             const [gamesList] = await write.query(`SELECT * FROM operator_games as og INNER JOIN games_master_list as gml on gml.game_id = og.game_id WHERE operator_id = ?`, [operatorId]);
             return res.status(200).send({ status: true, msg: "Games fetched successfully for operator", data: gamesList });
         } else {
@@ -21,10 +21,10 @@ const getOperatorGame = async(req, res)=> {
     }
 }
 
-const getOperatorGamesForService = async(req, res)=> {
-    try{
+const getOperatorGamesForService = async (req, res) => {
+    try {
         if (req.operator?.user?.user_type === 'admin') {
-            const {operator_id} = req.params;
+            const { operator_id } = req.params;
             const [gamesList] = await write.query(`SELECT * FROM operator_games as og INNER JOIN games_master_list as gml on gml.game_id = og.game_id WHERE operator_id = ?`, [operator_id]);
             return res.status(200).send({ status: true, msg: "Games fetched successfully for operator", data: gamesList });
         } else {
@@ -36,15 +36,15 @@ const getOperatorGamesForService = async(req, res)=> {
     }
 }
 
-const addGameForOperator = async(req, res)=> {
-    try{
+const addGameForOperator = async (req, res) => {
+    try {
         if (req.operator?.user?.user_type === 'admin') {
-            const {operator_id, game_id} = req.body;
+            const { operator_id, game_id } = req.body;
             await write.query(`INSERT INTO operator_games (game_id, operator_id) values(?,?)`, [game_id, operator_id]);
-            return res.status(200).send({ status: true, msg: "Game assigned successfully to operator"});
+            return res.status(200).send({ status: true, msg: "Game assigned successfully to operator" });
         } else {
             return res.status(200).send({ status: false, msg: "User not authorized to perform the operation" });
-        } 
+        }
     } catch (err) {
         console.log(err)
         return res.status(500).json({ msg: "Internal server Error", status: false })
@@ -67,14 +67,14 @@ const serviceAddGame = async (req, res) => {
     }
 }
 
-const getMasterListGames = async(req, res)=> {
-    try{
-    if(req.operator?.user?.user_type === 'admin'){
-        const [gamesList] = await write.query(`SELECT * FROM games_master_list WHERE is_active = 1`);
-        return res.status(200).send({ status: true, msg: "Games list fetched successfully", gamesList});
-    } else {
-        return res.status(400).send({ status: false, msg: "User not authorized to perform the operation" });
-    }
+const getMasterListGames = async (req, res) => {
+    try {
+        if (req.operator?.user?.user_type === 'admin') {
+            const [gamesList] = await write.query(`SELECT * FROM games_master_list WHERE is_active = 1`);
+            return res.status(200).send({ status: true, msg: "Games list fetched successfully", gamesList });
+        } else {
+            return res.status(400).send({ status: false, msg: "User not authorized to perform the operation" });
+        }
     } catch (err) {
         console.log(err)
         return res.status(500).json({ msg: "Internal server Error", status: false })

@@ -4,6 +4,7 @@ const {  serviceAddGame, serviceFindGame, getOperatorGame, getMasterListGames, g
 const { addGame, findGame, getGameFromServiceProvider } = require('../controller/operator/game');
 const { getUserBalance, updateUserBalance } = require('../controller/service/wallet');
 const { verifyToken } = require('../utilities/jwt/jsonwebtoken');
+const { activeUser } = require('../controller/service/user');
 
 const serviceRouter = require('express').Router();
 
@@ -11,6 +12,7 @@ const serviceRouter = require('express').Router();
 //Service Panel routes
 serviceRouter.post('/register/user', verifyToken, register);
 serviceRouter.post('/user/login', login);
+serviceRouter.get('/active/user', activeUser);
 serviceRouter.get('/operators/list', verifyToken, getOperatorList);
 serviceRouter.post('/register/game', verifyToken, serviceAddGame)
 serviceRouter.get('/games/list', verifyToken, getMasterListGames);
