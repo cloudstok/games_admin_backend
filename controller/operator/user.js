@@ -3,7 +3,7 @@ const axios = require('axios');
 const { generateRandomUserId, generateRandomString } = require("../../utilities/common_function");
 const { hashPassword, compare } = require("../../utilities/bcrypt/bcrypt");
 const { encryption, decryption } = require('../../utilities/ecryption-decryption');
-
+const jwt = require('jsonwebtoken')
 const addUser = async (req, res) => {
     try {
         const { id } = req.operator.user;
@@ -39,7 +39,7 @@ const userLogin = async (req, res) => {
             const reqTime = Date.now();
             let encryptedData = await encryption({ user_id, name, profile_url, currency_prefrence, reqTime }, secret);
             const {service_provider_url} = process.env;
-            console.log(service_provider_url)
+            
             //logging into service provider
             const options = {
                 method: 'POST',
@@ -75,7 +75,12 @@ const userLogin = async (req, res) => {
 
 const getUser = async (req, res) => {
     try {
-        const sql = "SELECT * FROM user where is_deleted = 0"
+        const tokenHeader = req.headers.authorization;
+        const token = tokenHeader.split(" ")[1];
+        const verifiedToken = jwt.verify(token, process.env.jwtSecretKey);
+     
+        verifiedToken.user.id
+        const sql = `SELECT * FROM user where  operator_id =${verifiedToken.user.id} and is_deleted = 0`
         const [data] = await read.query(sql)
         return res.status(200).send({ status: true, msg: "Find data", data })
     } catch (er) {
