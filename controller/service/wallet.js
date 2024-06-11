@@ -6,6 +6,7 @@ const getUserBalance = async(req, res) => {
     try{
         const token = req.headers.token;
         let validateUser = await getRedis(token);
+        console.log(validateUser , "validateUser")
         try{
             validateUser = JSON.parse(validateUser);
         }catch(err){

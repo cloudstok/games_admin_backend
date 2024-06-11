@@ -25,7 +25,7 @@ serviceRouter.get('/operator/game' , getOperatorGame);
 serviceRouter.post('/user/login/:id' , userLogin);
 
 //Call to Operator's API
-serviceRouter.get('/operator/user/balance', getUserBalance);
-serviceRouter.put('/operator/user/balance', updateUserBalance);
+serviceRouter.get('/operator/user/balance',  getUserBalance);
+serviceRouter.put('/operator/user/balance',  updateUserBalance);
 
 module.exports = { serviceRouter};
