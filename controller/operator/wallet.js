@@ -23,6 +23,16 @@ const findWallet = async (req ,res)=>{
     }
 }
 
+const AllWallet = async (req ,res)=>{
+    try{
+    const [data]=  await write.query("SELECT * FROM user inner join user_wallet on user.user_id = user_wallet.user_id;")
+        return res.status(200).send({ status: true, data })
+    }catch(er){
+        console.log(er)
+        return res.status(500).json({ msg: "Internal server Error", status: false })
+    }
+}
+
 const userBalance = async(req, res)=> {
     try{
         const {operator_id} = req.params;
@@ -69,4 +79,4 @@ const updateBalance = async(req, res)=> {
     }
 }
 
-module.exports = {addWallet , findWallet, userBalance, updateBalance}
+module.exports = {addWallet , findWallet, userBalance, updateBalance , AllWallet}
