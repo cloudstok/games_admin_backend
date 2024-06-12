@@ -34,8 +34,9 @@ const getUserBalance = async (req, res) => {
                     return res.status(data.status).send({ status: false, msg: `Request failed from upstream server with response:: ${JSON.stringify(data)}` })
                 }
             }).catch(err => {
-                console.error(`[ERR] while getting user balance from operator is::`, JSON.stringify(err))
-                return res.status(500).send({ status: false, msg: "We've encountered an internal error" });
+                return res.status(401).send(err.response.data);
+               // console.error(`[ERR] while getting user balance from operator is::`, JSON.stringify(err))
+               // return res.status(500).send({ status: false, msg: "We've encountered an internal error" });
             })
         } else {
             return res.status(400).send({ status: false, msg: "Invalid Token or session timed out" });
@@ -78,8 +79,10 @@ const updateUserBalance = async (req, res) => {
                     return res.status(data.status).send({ status: false, msg: `Request failed from upstream server with response:: ${JSON.stringify(data)}` })
                 }
             }).catch(err => {
-                console.error(`[ERR] while updating user balance from operator is::`, JSON.stringify(err))
-                return res.status(500).send({ status: false, msg: "We've encountered an internal error" });
+                let data = err.response.data
+                return res.status(401).send( {...data , code : 401} );
+               // console.error(`[ERR] while updating user balance from operator is::`, JSON.stringify(err))
+               // return res.status(500).send({ status: false, msg: "We've encountered an internal error" });
             })
         } else {
             return res.status(400).send({ status: false, msg: "Invalid Token or session timed out" });

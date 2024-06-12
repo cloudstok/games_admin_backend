@@ -93,11 +93,11 @@ const userLogin = async (req, res) => {
       if (user) {
         user = JSON.parse(user);
         user.push(token)
-        await setRedis('users', JSON.stringify(user), 3600)
+        await setRedis('users', JSON.stringify(user), 3600*24)
       } else {
-        await setRedis('users', JSON.stringify([token]), 3600)
+        await setRedis('users', JSON.stringify([token]), 3600*24)
       }
-      await setRedis(token, JSON.stringify({ userId: decodeData.user_id, operatorId: user_id, pub_key, secret }), 100)
+      await setRedis(token, JSON.stringify({ userId: decodeData.user_id, operatorId: user_id, pub_key, secret }), 3600)
       return res.status(200).send({ status: true, msg: "User authenticated", token })
     } else {
       return res.status(400).send({ status: false, msg: "Request initiated for Invalid Operator" });

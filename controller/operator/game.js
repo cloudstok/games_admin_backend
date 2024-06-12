@@ -75,18 +75,21 @@ const operatorFindGame = async (req, res) => {
         await axios(config).then(data => {
             if (data.status === 200) {
                 return res.status(200).send({ status: true, msg: "games list fetched successfully", data: data.data });
-            } else {
-                console.log(`received an invalid response from upstream server`);
-                return res.status(data.status).send({ status: false, msg: `Request failed from upstream server with response:: ${JSON.stringify(data)}` })
             }
+            //  else {
+            //     console.log(`received an invalid response from upstream server`);
+            //     return res.status(401).send({ status: false, msg: "Token Expired or Request timed out.!" })
+            // }
         }).catch(err => {
-            console.error(`[ERR] while getting games from service operator is::`, JSON.stringify(err))
-            return res.status(500).send({ status: false, msg: "We've encountered an internal error" });
+        //    console.error(`[ERR] while getting games from service operator is::`, err.response.data)
+          //  return res.status(401).send(err.response.data);
+            let data = err.response.data
+            return res.status(401).send( {...data , code : 401} );
         })
 
 
     } catch (er) {
-        console.log(er)
+        // console.log(er)
         return res.status(500).json({ msg: "Internal server Error", status: false })
     }
 }

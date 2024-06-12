@@ -54,13 +54,18 @@ const userLogin = async (req, res) => {
             await axios(options).then(data => {
                 if (data.status === 200) {
                     return res.status(200).send({ status: true, msg: "user logged in successfully", data: data.data, userId: userId });
-                } else {
+                } 
+                else {
                     console.log(`received an invalid response from upstream server`);
                     return res.status(data.status).send({ status: false, msg: `Request failed from upstream server with response:: ${JSON.stringify(data)}` })
                 }
             }).catch(err => {
-                console.error(`[ERR] while getting game data from service provider is::`, JSON.stringify(err))
-                return res.status(500).send({ status: false, msg: "We've encountered an internal error" });
+
+                let data = err.response.data
+                return res.status(401).send( {...data , code : 401} );
+             //   return res.status(401).send(err.response.data);
+              //  console.error(`[ERR] while getting game data from service provider is::`, JSON.stringify(err))
+              //  return res.status(500).send({ status: false, msg: "We've encountered an internal error" });
             })
 
         } else {
