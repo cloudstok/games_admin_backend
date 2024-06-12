@@ -12,7 +12,7 @@ const getOperatorGame = async (req, res) => {
             const [gamesList] = await write.query(`SELECT * FROM operator_games as og INNER JOIN games_master_list as gml on gml.game_id = og.game_id WHERE operator_id = ?`, [operatorId]);
             return res.status(200).send({ status: true, msg: "Games fetched successfully for operator", data: gamesList });
         } else {
-            return res.status(200).send({ status: true, msg: "Token Expired or Request timed out.!" });
+            return res.status(401).send({ status: false, msg: "Token Expired or Request timed out.!" });
         }
     } catch (err) {
         console.log(err)
@@ -27,7 +27,7 @@ const getOperatorGamesForService = async (req, res) => {
             const [gamesList] = await write.query(`SELECT * FROM operator_games as og INNER JOIN games_master_list as gml on gml.game_id = og.game_id WHERE operator_id = ?`, [operator_id]);
             return res.status(200).send({ status: true, msg: "Games fetched successfully for operator", data: gamesList });
         } else {
-            return res.status(200).send({ status: false, msg: "User not authorized to perform the operation" });
+            return res.status(401).send({ status: false, msg: "User not authorized to perform the operation" });
         }
     } catch (err) {
         console.log(err)
@@ -42,7 +42,7 @@ const addGameForOperator = async (req, res) => {
             await write.query(`INSERT INTO operator_games (game_id, operator_id) values(?,?)`, [game_id, operator_id]);
             return res.status(200).send({ status: true, msg: "Game assigned successfully to operator" });
         } else {
-            return res.status(200).send({ status: false, msg: "User not authorized to perform the operation" });
+            return res.status(401).send({ status: false, msg: "User not authorized to perform the operation" });
         }
     } catch (err) {
         console.log(err)
@@ -57,7 +57,7 @@ const serviceAddGame = async (req, res) => {
             await write.query("insert into games_master_list (name , url ) value(? , ?)", [name, url])
             return res.status(200).send({ status: true, msg: "games Add successfully to master's list" })
         } else {
-            return res.status(200).send({ status: false, msg: "User not authorized to perform the operation" });
+            return res.status(401).send({ status: false, msg: "User not authorized to perform the operation" });
         }
 
     } catch (err) {
@@ -72,7 +72,7 @@ const getMasterListGames = async (req, res) => {
             const [gamesList] = await write.query(`SELECT * FROM games_master_list WHERE is_active = 1`);
             return res.status(200).send({ status: true, msg: "Games list fetched successfully", gamesList });
         } else {
-            return res.status(400).send({ status: false, msg: "User not authorized to perform the operation" });
+            return res.status(401).send({ status: false, msg: "User not authorized to perform the operation" });
         }
     } catch (err) {
         console.log(err)

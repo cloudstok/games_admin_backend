@@ -11,11 +11,11 @@ async function verifyToken(req, res, next) {
   try {
     const tokenHeader = req.headers.authorization;
     if (!tokenHeader)
-      return res.status(401).json({ "message": "Token not found" });
+      return res.status(401).json({ status : false , "message": "Token not found" });
     const token = tokenHeader.split(" ")[1];
     const verifiedToken = jwt.verify(token, process.env.jwtSecretKey);
     if (!verifiedToken)
-      return res.status(401).json({ "message": "invalid token" })
+      return res.status(401).json({ status : false , "message": "invalid token" })
     req.operator = verifiedToken;
     // return(res.locals.auth)
     next()
@@ -29,17 +29,17 @@ auth = (auth) => async (req, res, next) => {
   try {
     const tokenHeader = req.headers.authorization;
     if (!tokenHeader)
-      return res.status(401).json({ "message": "Token not found" });
+      return res.status(401).json({ status : false ,"message": "Token not found" });
     const token = tokenHeader.split(" ")[1];
     const verifiedToken = jwt.verify(token, process.env.jwtSecretKey);
     if (!verifiedToken) {
-      return res.status(401).json({ "message": "invalid token" })
+      return res.status(401).json({ status : false , "message": "invalid token" })
     }
     if (auth.includes(verifiedToken.user.role)) {
       res.locals.auth = verifiedToken;
       next()
     } else {
-      return res.status(401).send({ msg: "You are not authorized.", status: false })
+      return res.status(401).send({ status : false , msg: "You are not authorized.", status: false })
     }
   } catch (err) {
     return res.status(400).send({ err })

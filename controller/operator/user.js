@@ -22,9 +22,9 @@ const addUser = async (req, res) => {
 
 
 
-const   userLogin = async (req, res) => {
+const userLogin = async (req, res) => {
     try {
-        
+
         // const { pub_key, secret } = req.operator.user;
         const [getOperator] = await write.query(`SELECT * FROM operator WHERE user_type = 'operator' and is_deleted = 0 LIMIT 1`);
         const { pub_key, secret } = getOperator[0];
@@ -38,8 +38,8 @@ const   userLogin = async (req, res) => {
             const { user_id, name, profile_url, currency_prefrence } = getUser[0];
             const reqTime = Date.now();
             let encryptedData = await encryption({ user_id, name, profile_url, currency_prefrence, reqTime }, secret);
-            const {service_provider_url} = process.env;
-            
+            const { service_provider_url } = process.env;
+
             //logging into service provider
             const options = {
                 method: 'POST',
@@ -48,17 +48,17 @@ const   userLogin = async (req, res) => {
                     'Content-Type': 'application/json'
                 },
                 data: {
-                   data: encryptedData
+                    data: encryptedData
                 }
             };
-            await axios(options).then(data=>{
-                if(data.status === 200){
-                    return res.status(200).send({ status: true, msg: "user logged in successfully", data: data.data,userId:userId});
-                }else{
+            await axios(options).then(data => {
+                if (data.status === 200) {
+                    return res.status(200).send({ status: true, msg: "user logged in successfully", data: data.data, userId: userId });
+                } else {
                     console.log(`received an invalid response from upstream server`);
-                    return res.status(data.status).send({ status: false, msg:`Request failed from upstream server with response:: ${JSON.stringify(data)}` })
+                    return res.status(data.status).send({ status: false, msg: `Request failed from upstream server with response:: ${JSON.stringify(data)}` })
                 }
-            }).catch(err=>{
+            }).catch(err => {
                 console.error(`[ERR] while getting game data from service provider is::`, JSON.stringify(err))
                 return res.status(500).send({ status: false, msg: "We've encountered an internal error" });
             })
@@ -78,7 +78,7 @@ const getUser = async (req, res) => {
         const tokenHeader = req.headers.authorization;
         const token = tokenHeader.split(" ")[1];
         const verifiedToken = jwt.verify(token, process.env.jwtSecretKey);
-     
+
         verifiedToken.user.id
         const sql = `SELECT * FROM user where  operator_id =${verifiedToken.user.id} and is_deleted = 0`
         const [data] = await read.query(sql)
@@ -108,4 +108,4 @@ const updateUser = async (req, res) => {
 
 
 
-module.exports = { addUser, userLogin , getUser }
+module.exports = { addUser, userLogin, getUser }

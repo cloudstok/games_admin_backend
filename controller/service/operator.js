@@ -53,7 +53,7 @@ const register = async (req, res) => {
         return res.status(200).send({ status: true, msg: "Operator registered successfully", data: { name, userId, password, pub_key, secret_key, user_type } });
       }
     } else {
-      return res.status(400).send({ status: false, msg: "User not authorized to perform the operation" });
+      return res.status(401).send({ status: false, msg: "User not authorized to perform the operation" });
     }
   } catch (error) {
     console.log(error)
@@ -67,7 +67,7 @@ const getOperatorList = async (req, res) => {
       const [operatorList] = await write.query(`SELECT  * FROM operator where user_type = 'operator' and is_deleted = 0`);
       return res.status(200).send({ status: true, msg: "Operators list fetched successfully", data: operatorList });
     } else {
-      return res.status(400).send({ status: false, msg: "User not authorized to perform the operation" });
+      return res.status(401).send({ status: false, msg: "User not authorized to perform the operation" });
     }
   } catch (error) {
     console.log(error)

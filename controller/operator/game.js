@@ -14,7 +14,7 @@ const addGame = async (req, res) => {
             return res.status(200).send({ status: true, msg: "games Add successfully to master's list" })
 
         } else {
-            return res.status(400).send({ status: false, msg: "User not authorized to perform the operation" });
+            return res.status(401).send({ status: false, msg: "User not authorized to perform the operation" });
         }
     } catch (err) {
         console.log(err)
@@ -37,7 +37,7 @@ const findGame = async (req, res) => {
             const [data] = await write.query("select * from operator_games as op right join games_master_list as gml on gml.game_id = op.game_id where operator_id = ?", [validateUser.operatorId]);
             return res.status(200).send({ status: true, data })
         } else {
-            return res.status(400).send({ status: false, msg: "Session expired.! Please login again." });
+            return res.status(401).send({ status: false, msg: "Session expired.! Please login again." });
         }
     } catch (er) {
         console.log(er)
