@@ -54,9 +54,6 @@ const getGameFromServiceProvider = async (req, res) => {
                 "token": token
             }
         })
-
-        console.log(data)
-
     } catch (er) {
         console.log(er)
         return res.status(500).json({ msg: "Internal server Error", status: false })

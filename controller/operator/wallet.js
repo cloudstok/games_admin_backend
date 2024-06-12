@@ -37,7 +37,7 @@ const userBalance = async(req, res)=> {
     try{
         const {operator_id} = req.params;
         const {data} = req.body;
-        const [getOperator] = await write.query(`SELECT secret FROM operator WHERE operator_id = ?`, [operator_id]);
+        const [getOperator] = await write.query(`SELECT secret FROM operator WHERE user_id = ?`, [operator_id]);
         if(getOperator.length > 0){
             const {secret} = getOperator[0];
             const {userId} = await decryption(data, secret);
@@ -60,7 +60,7 @@ const updateBalance = async(req, res)=> {
     try{
         const {operator_id} = req.params;
         const {data} = req.body;
-        const [getOperator] = await write.query(`SELECT secret FROM operator WHERE operator_id = ?`, [operator_id]);
+        const [getOperator] = await write.query(`SELECT secret FROM operator WHERE user_id = ?`, [operator_id]);
         if(getOperator.length > 0){
             const {secret} = getOperator[0];
             const {userId, balance} = await decryption(data, secret);

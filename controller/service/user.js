@@ -5,7 +5,6 @@ const activeUser = async (req, res) => {
         //   await deleteRedis('users')
         const finalData = []
         let user = JSON.parse(await getRedis('users'))
-        console.log(user)
         if (user) {
             for (let x of user) {
                 //  {x : JSON.parse(await getRedis(x))}

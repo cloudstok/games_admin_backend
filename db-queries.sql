@@ -68,3 +68,8 @@ CREATE TABLE `operator_games` (
 ALTER TABLE `operator` ADD COLUMN `user_type` ENUM('admin', 'operator') NOT NULL DEFAULT 'operator' AFTER `secret`;
 
 INSERT INTO operator (`name`, `user_id`, `password`, `pub_key`, `secret`, `user_type`) values('cloudstok', 'cloudstok_6655', '$2b$10$GZeHWlklKMCtMMfzHtdaU.CjqfhXIN4AMUh1X7tAduxjUohSxIXM2', '1l3s!i)AajTz', 'GiJZHWZbal(roHzEbb%TJa(^BD02xHRg', 'admin'); 
+
+ALTER TABLE `user_wallet` CHANGE COLUMN `user_id` `user_id` VARCHAR(60) NOT NULL ;
+
+
+insert into games_master_list (name, url, image) values('avaitor', 'https://aviator.ayodhya365.co/', 'https://jaunpur123.s3.ap-south-1.amazonaws.com/1717673785290_aviator-pic.jpg');
