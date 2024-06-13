@@ -10,6 +10,7 @@ CREATE TABLE `user` (
    password varchar(255) NOT NULL,
    profile_url varchar(255) DEFAULT NULL,
    currency_prefrence varchar(11) DEFAULT NULL,
+   is_wallet boolean default false,
    is_deleted tinyint(1) NOT NULL DEFAULT '0',
    created_at timestamp NULL DEFAULT CURRENT_TIMESTAMP,
    updated_at timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -26,6 +27,7 @@ CREATE TABLE `operator` (
    profile_url varchar(255) DEFAULT NULL,
    pub_key varchar(60) NOT NULL,
    secret varchar(255) NOT NULL,
+   user_type ENUM('admin', 'operator') NOT NULL DEFAULT 'operator',
    is_deleted tinyint(1) NOT NULL DEFAULT '0',
    created_at timestamp NULL DEFAULT CURRENT_TIMESTAMP,
    updated_at timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -45,7 +47,7 @@ CREATE TABLE `games_master_list` (
 
 CREATE TABLE `user_wallet` (
 	id int not null AUTO_INCREMENT,
-    user_id varchar(11) not null,
+    user_id VARCHAR(60)  unique not null,
     balance varchar(11) not null,
     is_active boolean default true,
     created_at timestamp NULL DEFAULT CURRENT_TIMESTAMP,
@@ -64,12 +66,13 @@ CREATE TABLE `operator_games` (
    PRIMARY KEY (id)
 ) ENGINE = InnoDB AUTO_INCREMENT = 2 DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
 
-
-ALTER TABLE `operator` ADD COLUMN `user_type` ENUM('admin', 'operator') NOT NULL DEFAULT 'operator' AFTER `secret`;
+-- ALTER TABLE `operator` ADD COLUMN `user_type` ENUM('admin', 'operator') NOT NULL DEFAULT 'operator' AFTER `secret`;
 
 INSERT INTO operator (`name`, `user_id`, `password`, `pub_key`, `secret`, `user_type`) values('cloudstok', 'cloudstok_6655', '$2b$10$GZeHWlklKMCtMMfzHtdaU.CjqfhXIN4AMUh1X7tAduxjUohSxIXM2', '1l3s!i)AajTz', 'GiJZHWZbal(roHzEbb%TJa(^BD02xHRg', 'admin'); 
 
-ALTER TABLE `user_wallet` CHANGE COLUMN `user_id` `user_id` VARCHAR(60) NOT NULL ;
+-- ALTER TABLE `user_wallet` CHANGE COLUMN `user_id` `user_id` VARCHAR(60) NOT NULL ;
 
 
 insert into games_master_list (name, url, image) values('avaitor', 'https://aviator.ayodhya365.co/', 'https://jaunpur123.s3.ap-south-1.amazonaws.com/1717673785290_aviator-pic.jpg');
+
+
