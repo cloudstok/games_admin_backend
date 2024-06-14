@@ -46,20 +46,6 @@ const findGame = async (req, res) => {
 }
 
 
-const getGameFromServiceProvider = async (req, res) => {
-    try {
-        const { token } = req.headers;
-        let data = await axios.get('localhost:4000/operator/game', {
-            headers: {
-                "token": token
-            }
-        })
-    } catch (er) {
-        console.log(er)
-        return res.status(500).json({ msg: "Internal server Error", status: false })
-    }
-}
-
 const operatorFindGame = async (req, res) => {
     try {
         const { token } = req.headers;
@@ -94,4 +80,4 @@ const operatorFindGame = async (req, res) => {
     }
 }
 
-module.exports = { addGame, findGame, getGameFromServiceProvider, operatorFindGame }
+module.exports = { addGame, findGame, operatorFindGame }

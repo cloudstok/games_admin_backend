@@ -39,7 +39,7 @@ const userBalance = async (req, res) => {
         // console.log(req.headers.host);
         const { data } = req.body;
         const [getOperator] = await write.query(`SELECT secret FROM operator WHERE url = ?`, ['http://' + req.headers.host]);
-           console.log(getOperator)
+           console.log(getOperator , "operator")
         if (getOperator.length > 0) {
             const { secret } = getOperator[0];
             const { userId } = await decryption(data, secret);
@@ -60,9 +60,10 @@ const userBalance = async (req, res) => {
 
 const updateBalance = async (req, res) => {
     try {
-        const { operator_id } = req.params;
+        // const { operator_id } = req.params;
         const { data } = req.body;
         const [getOperator] = await write.query(`SELECT secret FROM operator WHERE url = ?`, ['http://' + req.headers.host]);
+        console.log(getOperator , "getOperator")
         if (getOperator.length > 0) {
             const { secret } = getOperator[0];
             const { userId, balance } = await decryption(data, secret);

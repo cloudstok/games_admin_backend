@@ -31,14 +31,18 @@ const userLogin = async (req, res) => {
         const { userId, password } = req.body;
         const [getUser] = await write.query(`SELECT * FROM user WHERE user_id = ?`, [userId]);
 
-        //const [[wallet]] = await write.query(`SELECT * FROM user_wallet WHERE user_id = ?`, [userId]);
+        const [[wallet]] = await write.query(`SELECT * FROM user_wallet WHERE user_id = ?`, [userId]);
         if (getUser.length > 0) {
             const checkPassword = await compare(password, getUser[0].password)
             if (!checkPassword) {
                 return res.status(401).json({ status: false, msg: "Missing or Incorrect Credentials" });
             }
             const { user_id, name, profile_url, currency_prefrence } = getUser[0];
-            //const {balance} = wallet
+         
+                const {balance} = wallet
+            
+
+          
 
             const reqTime = Date.now();
             let encryptedData = await encryption({ user_id, name, profile_url, currency_prefrence, reqTime }, secret);
@@ -57,7 +61,7 @@ const userLogin = async (req, res) => {
             };
             await axios(options).then(data => {
                 if (data.status === 200) {
-                    return res.status(200).send({  ...data.data});
+                    return res.status(200).send({  ...data.data , user_id, name,balance ,avatar : "dfdfd" });
                 } 
                 else {
                     console.log(`received an invalid response from upstream server`);
