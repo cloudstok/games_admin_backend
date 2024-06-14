@@ -24,7 +24,7 @@ CREATE TABLE `operator` (
    name varchar(60) unique not null,
    user_id varchar(60) not null,
    password varchar(255) NOT NULL,
-   profile_url varchar(255) DEFAULT NULL,
+   url varchar(255) DEFAULT NULL,
    pub_key varchar(60) NOT NULL,
    secret varchar(255) NOT NULL,
    user_type ENUM('admin', 'operator') NOT NULL DEFAULT 'operator',

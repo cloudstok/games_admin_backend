@@ -35,10 +35,10 @@ const login = async (req, res) => {
 
 const register = async (req, res) => {
   try {
-    console.log(req.operator)
-    console.log(req.operator?.user?.user_type)
+    // console.log(req.operator)
+    // console.log(req.operator?.user?.user_type)
     if (req.operator?.user?.user_type === 'admin') {
-      const { name, user_type } = req.body;
+      const { name, user_type , url } = req.body;
       const [data] = await read.query("SELECT * FROM operator where name = ?", [name]);
       if (data.length > 0) {
         return res.status(200).send({ status: false, msg: "Operator already registered with this name" });
@@ -55,8 +55,8 @@ const register = async (req, res) => {
         const [password, secret_key, pub_key] = parts;
         const hashedPassword = await hashPassword(password);
         let userType = user_type ? user_type : 'operator';
-        await write.query("INSERT  IGNORE INTO operator (name, user_id, password, pub_key, secret, user_type) VALUES (?,?,?,?,?, ?)", [name, userId, hashedPassword, pub_key, secret_key, userType]);
-        return res.status(200).send({ status: true, msg: "Operator registered successfully", data: { name, userId, password, pub_key, secret_key, user_type } });
+        await write.query("INSERT  IGNORE INTO operator (name, user_id, password, pub_key, secret, user_type , url) VALUES (?,?,?,?,?, ? , ?)", [name, userId, hashedPassword, pub_key, secret_key, userType , url]);
+        return res.status(200).send({ status: true, msg: "Operator registered successfully", data: { name, userId, password, pub_key, secret_key, user_type , url } });
       }
     } else {
       return res.status(401).send({ status: false, msg: "User not authorized to perform the operation" });
@@ -87,7 +87,7 @@ const userLogin = async (req, res) => {
     let { data } = req.body;
     const [getOperator] = await write.query(`SELECT * FROM operator WHERE pub_key = ?`, [id]);
     if (getOperator.length > 0) {
-      const { user_id, pub_key, secret } = getOperator[0];
+      const { user_id, pub_key, secret  , url} = getOperator[0];
       const decodeData = await decryption(data, secret);
       let timeDifference = (Date.now() - decodeData.reqTime) / 1000;
       if (timeDifference > 5) {
@@ -103,7 +103,8 @@ const userLogin = async (req, res) => {
       } else {
         await setRedis('users', JSON.stringify([token]), 3600*24)
       }
-      await setRedis(token, JSON.stringify({ userId: decodeData.user_id, operatorId: user_id, pub_key, secret }), 3600)
+      console.log({ userId: decodeData.user_id, operatorId: user_id, pub_key, secret  , url})
+      await setRedis(token, JSON.stringify({ userId: decodeData.user_id, operatorId: user_id, pub_key, secret  , url}), 3600)
       return res.status(200).send({ status: true, msg: "User authenticated", token })
     } else {
       return res.status(400).send({ status: false, msg: "Request initiated for Invalid Operator" });

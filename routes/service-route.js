@@ -19,7 +19,6 @@ serviceRouter.get('/games/list', verifyToken, getMasterListGames);
 serviceRouter.get('/game/operator/:operator_id', verifyToken, getOperatorGamesForService);
 serviceRouter.post('/register/operator/game', verifyToken, addGameForOperator);
 
-
 //Call from Operator's API
 serviceRouter.get('/operator/game', getOperatorGame);
 serviceRouter.post('/user/login/:id', userLogin);
