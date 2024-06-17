@@ -11,8 +11,8 @@ operatorRouter.post('/game', serviceAddGame)
 operatorRouter.post('/wallet', addWallet)
 operatorRouter.get('/wallet/:user_id', findWallet)
 operatorRouter.get('/wallet', AllWallet)
-operatorRouter.post('/user/balance/:operator_id', userBalance);
-operatorRouter.put('/user/balance/:operator_id', updateBalance);
+operatorRouter.post('/user/balance', userBalance);
+operatorRouter.put('/user/balance', updateBalance);
 operatorRouter.get('/games/list', operatorFindGame);
 operatorRouter.get('/user/list', getUser);
 operatorRouter.get('/user/logout', logout);

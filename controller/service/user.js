@@ -26,11 +26,14 @@ const logout = async (req, res) => {
         const activeUser = []
         const token = req.headers.token
         let user = JSON.parse(await getRedis('users'))
-        for (let x of user) {
-            if (token != x) {
-                activeUser.push(x)
+        if(user){
+            for (let x of user) {
+                if (token != x) {
+                    activeUser.push(x)
+                }
             }
         }
+     
         if (activeUser.length > 0) {
             await setRedis('users', JSON.stringify(activeUser), 100000)
         }

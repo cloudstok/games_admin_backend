@@ -24,7 +24,7 @@ CREATE TABLE `operator` (
    name varchar(60) unique not null,
    user_id varchar(60) not null,
    password varchar(255) NOT NULL,
-   profile_url varchar(255) DEFAULT NULL,
+   url varchar(255) DEFAULT NULL,
    pub_key varchar(60) NOT NULL,
    secret varchar(255) NOT NULL,
    user_type ENUM('admin', 'operator') NOT NULL DEFAULT 'operator',
@@ -75,4 +75,13 @@ INSERT INTO operator (`name`, `user_id`, `password`, `pub_key`, `secret`, `user_
 
 insert into games_master_list (name, url, image) values('avaitor', 'https://aviator.ayodhya365.co/', 'https://jaunpur123.s3.ap-south-1.amazonaws.com/1717673785290_aviator-pic.jpg');
 
-
+CREATE TABLE transaction (
+   id int primary key auto_increment,
+    userId varchar(255) ,
+    balance varchar(30),
+    operatorId varchar(30),
+    url VARCHAR(255),
+    data TEXT,
+created_at timestamp default CURRENT_TIMESTAMP,
+updated_at timestamp default CURRENT_TIMESTAMP
+);
