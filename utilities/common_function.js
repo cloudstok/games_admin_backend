@@ -1,4 +1,5 @@
-
+const crypto = require('crypto');
+const {write} = require('../db_config/db');
 async function generateRandomString(length) {
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()";
     let randomString = "";
@@ -45,11 +46,6 @@ async function generateUUID() {
 }
 
 
-
-
-
-const crypto = require('crypto');
-
 function generateUUIDv7() {
     // Get current time in milliseconds since Unix epoch
     const timestamp = Date.now();
@@ -75,5 +71,13 @@ function generateUUIDv7() {
 // Generate a UUID v7
 // const uuid7 = generateUUIDv7();
 
+const getWebhookUrl = async(user_id, event_name) => {
+    try{
+        const [getWebhookUrl] = await write.query(`SELECT webhook_url FROM webhook_config where user_id = ? and event = ?`, [user_id, event_name]);
+        return getWebhookUrl[0].webhook_url;
+    }catch(err){
+        return false;
+    }
+}
 
-module.exports = { generateRandomString, generateRandomUserId, generateUUID , generateUUIDv7}
+module.exports = { generateRandomString, generateRandomUserId, generateUUID , generateUUIDv7, getWebhookUrl}

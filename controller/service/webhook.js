@@ -18,7 +18,8 @@ const webhook= async(req , res)=>{
     try{
         const {user_id} = req.params
         const sql = "SELECT * FROM webhook_config where user_id = ?"
-        await write.query(sql, [user_id])
+        const [getWebhookDetails]= await write.query(sql, [user_id]);
+        return res.status(200).send({ status: true, msg: "Webhook list fetched successfully", getWebhookDetails})
     }catch(err){
         console.error(`[Err] while trying to get user balance is:::`, err)
         res.status(500).send({ status: false, msg: "Internal Server error" });
@@ -30,7 +31,8 @@ const get_webhook= async(req , res)=>{
     try{
     
         const sql = "SELECT * FROM webhook_config"
-        await write.query(sql)
+        const [getWebhookDetails]= await write.query(sql);
+        return res.status(200).send({ status: true, msg: "Webhook list fetched successfully", getWebhookDetails})
     }catch(err){
         console.error(`[Err] while trying to get user balance is:::`, err)
         res.status(500).send({ status: false, msg: "Internal Server error" });
