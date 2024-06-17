@@ -35,8 +35,6 @@ const login = async (req, res) => {
 
 const register = async (req, res) => {
   try {
-    // console.log(req.operator)
-    // console.log(req.operator?.user?.user_type)
     if (req.operator?.user?.user_type === 'admin') {
       const { name, user_type , url } = req.body;
       const [data] = await read.query("SELECT * FROM operator where name = ?", [name]);
