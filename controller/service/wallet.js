@@ -2,6 +2,7 @@ const axios = require('axios');
 const { getRedis } = require('../../redis/connection');
 const { encryption } = require('../../utilities/ecryption-decryption');
 const { write } = require('../../db_config/db');
+const { getWebhookUrl } = require('../../utilities/common_function');
 
 const getUserBalance = async (req, res) => {
     try {
@@ -13,27 +14,31 @@ const getUserBalance = async (req, res) => {
             return res.status(400).send({ status: false, msg: "We've encountered an internal error" })
         }
         if (validateUser) {
-            const { operatorId, url } = validateUser;
-            let operatorBaseUrl = url;
-            const options = {
-                method: 'GET',
-                url: `${operatorBaseUrl}/operator/user/balance`,
-                headers: {
-                    'Content-Type': 'application/json',
-                    token
-                }
-            };
-          
-            await axios(options).then(data => {
-                if (data.status === 200) {
-                    return res.status(200).send( data.data );
-                } else {
-                    console.log(`received an invalid response from upstream server`);
-                    return res.status(data.status).send({ status: false, msg: `Request failed from upstream server with response:: ${JSON.stringify(data)}` })
-                }
-            }).catch(err => {
-                return res.status(401).send(err?.response?.data);
-            })
+            const { operatorId } = validateUser;
+            let operatorUrl = await getWebhookUrl(operatorId, "GET_BALANCE")
+            if(operatorUrl){
+                const options = {
+                    method: 'GET',
+                    url: operatorUrl,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        token
+                    }
+                };
+              
+                await axios(options).then(data => {
+                    if (data.status === 200) {
+                        return res.status(200).send( data.data );
+                    } else {
+                        console.log(`received an invalid response from upstream server`);
+                        return res.status(data.status).send({ status: false, msg: `Request failed from upstream server with response:: ${JSON.stringify(data)}` })
+                    }
+                }).catch(err => {
+                    return res.status(401).send(err?.response?.data);
+                })
+            }else{
+                return res.status(400).send({ status: false, msg: "No URL configured for the event"});
+            }
         } else {
             return res.status(400).send({ status: false, msg: "Invalid Token or session timed out" });
         }
@@ -54,41 +59,44 @@ const updateUserBalance = async (req, res) => {
             return res.status(400).send({ status: false, msg: "We've encountered an internal error" })
         }
         if (validateUser) {
-            const { operatorId, secret, userId  , url} = validateUser;
-            // let operatorBaseUrl = process.env.operator_base_url;
-            let operatorBaseUrl = url;
+            const { operatorId, secret, userId} = validateUser;
+            const operatorUrl = await getWebhookUrl(operatorId, "UPDATE_BALANCE");
             let encryptedData = await encryption({ balance , txn_id , description, txn_type }, secret);
-            const options = {
-                method: 'POST',
-                url: `${operatorBaseUrl}/operator/user/balance`,
-                headers: {
-                    'Content-Type': 'application/json',
-                    token
-                },
-                data: {
-                    data: encryptedData
-                   
-                }
-            };
-            await axios(options).then(async data => {
-                // userId, balance , update , operatorId, url , data
-                // history transaction 
-               let sql = "INSERT INTO transaction (userId, balance, operatorId, data , txn_id ,  description, txn_type) VALUES (? ,?, ?, ? ,? , ?, ?)";
-                 await write.query(sql , [ userId, balance  , operatorId, JSON.stringify(data?.data) , txn_id , description, txn_type])
-                if (data.status === 200) {
-                    return res.status(200).send( data.data);
-                } else {
-                    console.log(`received an invalid response from upstream server`);
-                    return res.status(data.status).send({ status: false, msg: `Request failed from upstream server with response:: ${JSON.stringify(data)}` })
-                }
-            }).catch( async err => {
-                let data = err?.response?.data
-                let sql = "INSERT INTO transaction (userId, balance, operatorId, data,  txn_id ,  description, txn_type) VALUES (? ,?, ?, ? ,?,?,?)";
-                await write.query(sql , [ userId, balance  , operatorId, JSON.stringify(data?.data), txn_id , description, txn_type])
-                return res.status(500).send( {status:false , msg : "Internal Server error"} );
-               // console.error(`[ERR] while updating user balance from operator is::`, JSON.stringify(err))
-               // return res.status(500).send({ status: false, msg: "We've encountered an internal error" });
-            })
+            if(operatorUrl){
+                const options = {
+                    method: 'POST',
+                    url: operatorUrl,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        token
+                    },
+                    data: {
+                        data: encryptedData
+                       
+                    }
+                };
+                await axios(options).then(async data => {
+                    // userId, balance , update , operatorId, url , data
+                    // history transaction 
+                   let sql = "INSERT INTO transaction (userId, balance, operatorId, data , txn_id ,  description, txn_type) VALUES (? ,?, ?, ? ,? , ?, ?)";
+                     await write.query(sql , [ userId, balance  , operatorId, JSON.stringify(data?.data) , txn_id , description, txn_type])
+                    if (data.status === 200) {
+                        return res.status(200).send( data.data);
+                    } else {
+                        console.log(`received an invalid response from upstream server`);
+                        return res.status(data.status).send({ status: false, msg: `Request failed from upstream server with response:: ${JSON.stringify(data)}` })
+                    }
+                }).catch( async err => {
+                    let data = err?.response?.data
+                    let sql = "INSERT INTO transaction (userId, balance, operatorId, data,  txn_id ,  description, txn_type) VALUES (? ,?, ?, ? ,?,?,?)";
+                    await write.query(sql , [ userId, balance  , operatorId, JSON.stringify(data?.data), txn_id , description, txn_type])
+                    return res.status(500).send( {status:false , msg : "Internal Server error"} );
+                   // console.error(`[ERR] while updating user balance from operator is::`, JSON.stringify(err))
+                   // return res.status(500).send({ status: false, msg: "We've encountered an internal error" });
+                })
+             }else{
+                return res.status(400).send({ status: false, msg: "No URL configured for the event"});
+            }
         } else {
             return res.status(401).send({ status: false, msg: "Invalid Token or session timed out" });
         }
