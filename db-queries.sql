@@ -85,3 +85,12 @@ CREATE TABLE transaction (
 created_at timestamp default CURRENT_TIMESTAMP,
 updated_at timestamp default CURRENT_TIMESTAMP
 );
+
+CREATE TABLE webhook_config (
+id int primary key auto_increment,
+user_id varchar(255) ,
+event varchar(255),
+webhook_url VARCHAR(255),
+created_at timestamp default CURRENT_TIMESTAMP,
+updated_at timestamp default CURRENT_TIMESTAMP
+);
