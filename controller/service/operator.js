@@ -11,6 +11,10 @@ const login = async (req, res) => {
   try {
     const { userId, password } = req.body
     const [data] = await read.query("SELECT id, user_id, password, pub_key, secret, user_type  FROM operator where user_id = ?", [userId])
+
+
+    // const [wallet] = await read.query("SELECT id, user_id, password, pub_key, secret, user_type  FROM operator where user_id = ?", [userId])
+
     if (data.length > 0) {
       const checkPassword = await compare(password, data[0].password)
 
@@ -31,6 +35,8 @@ const login = async (req, res) => {
 
 const register = async (req, res) => {
   try {
+    console.log(req.operator)
+    console.log(req.operator?.user?.user_type)
     if (req.operator?.user?.user_type === 'admin') {
       const { name, user_type } = req.body;
       const [data] = await read.query("SELECT * FROM operator where name = ?", [name]);
@@ -49,7 +55,7 @@ const register = async (req, res) => {
         const [password, secret_key, pub_key] = parts;
         const hashedPassword = await hashPassword(password);
         let userType = user_type ? user_type : 'operator';
-        await write.query("INSERT INTO operator (name, user_id, password, pub_key, secret, user_type) VALUES (?,?,?,?,?, ?)", [name, userId, hashedPassword, pub_key, secret_key, userType]);
+        await write.query("INSERT  IGNORE INTO operator (name, user_id, password, pub_key, secret, user_type) VALUES (?,?,?,?,?, ?)", [name, userId, hashedPassword, pub_key, secret_key, userType]);
         return res.status(200).send({ status: true, msg: "Operator registered successfully", data: { name, userId, password, pub_key, secret_key, user_type } });
       }
     } else {

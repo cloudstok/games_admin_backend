@@ -4,7 +4,8 @@ const { decryption } = require("../../utilities/ecryption-decryption");
 const addWallet = async (req, res) => {
     try {
         const { user_id } = req.body
-        await write.query("insert into user_wallet (user_id ,balance) value(? , ?)", [user_id, '3000'])
+        await write.query("insert IGNORE into user_wallet (user_id ,balance) value(? , ?)", [user_id, '3000.00'])
+        await write.query("update user set is_wallet = ? where  user_id  = ?", [true ,  user_id])
         return res.status(200).send({ status: true, msg: "Wallet Add successfully to master's list" })
     } catch (err) {
         console.log(err)

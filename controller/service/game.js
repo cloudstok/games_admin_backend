@@ -39,7 +39,7 @@ const addGameForOperator = async (req, res) => {
     try {
         if (req.operator?.user?.user_type === 'admin') {
             const { operator_id, game_id } = req.body;
-            await write.query(`INSERT INTO operator_games (game_id, operator_id) values(?,?)`, [game_id, operator_id]);
+            await write.query(`INSERT IGNORE INTO operator_games (game_id, operator_id) values(?,?)`, [game_id, operator_id]);
             return res.status(200).send({ status: true, msg: "Game assigned successfully to operator" });
         } else {
             return res.status(401).send({ status: false, msg: "User not authorized to perform the operation" });
@@ -54,7 +54,7 @@ const serviceAddGame = async (req, res) => {
     try {
         if (req.operator?.user?.user_type === 'admin') {
             const { name, url } = req.body
-            await write.query("insert into games_master_list (name , url ) value(? , ?)", [name, url])
+            await write.query("insert IGNORE into games_master_list (name , url ) value(? , ?)", [name, url])
             return res.status(200).send({ status: true, msg: "games Add successfully to master's list" })
         } else {
             return res.status(401).send({ status: false, msg: "User not authorized to perform the operation" });
