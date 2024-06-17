@@ -101,7 +101,6 @@ const userLogin = async (req, res) => {
       } else {
         await setRedis('users', JSON.stringify([token]), 3600*24)
       }
-      console.log({ userId: decodeData.user_id, operatorId: user_id, pub_key, secret  , url})
       await setRedis(token, JSON.stringify({ userId: decodeData.user_id, operatorId: user_id, pub_key, secret  , url}), 3600)
       return res.status(200).send({ status: true, msg: "User authenticated", token })
     } else {

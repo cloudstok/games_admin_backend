@@ -7,25 +7,20 @@ const getUserBalance = async (req, res) => {
     try {
         const token = req.headers.token;
         let validateUser = await getRedis(token);
-        // console.log(validateUser, "validateUser")
         try {
             validateUser = JSON.parse(validateUser);
         } catch (err) {
             return res.status(400).send({ status: false, msg: "We've encountered an internal error" })
         }
         if (validateUser) {
-            const { userId, operatorId, secret , url } = validateUser;
-            //let operatorBaseUrl = process.env.operator_base_url;
+            const { operatorId, url } = validateUser;
             let operatorBaseUrl = url;
-            let encryptedData = await encryption({ userId }, secret);
             const options = {
-                method: 'POST',
+                method: 'GET',
                 url: `${operatorBaseUrl}/operator/user/balance`,
                 headers: {
-                    'Content-Type': 'application/json'
-                },
-                data: {
-                    data: encryptedData
+                    'Content-Type': 'application/json',
+                    token
                 }
             };
           
@@ -37,10 +32,7 @@ const getUserBalance = async (req, res) => {
                     return res.status(data.status).send({ status: false, msg: `Request failed from upstream server with response:: ${JSON.stringify(data)}` })
                 }
             }).catch(err => {
-                // console.log(err)
                 return res.status(401).send(err?.response?.data);
-               // console.error(`[ERR] while getting user balance from operator is::`, JSON.stringify(err))
-               // return res.status(500).send({ status: false, msg: "We've encountered an internal error" });
             })
         } else {
             return res.status(400).send({ status: false, msg: "Invalid Token or session timed out" });
@@ -54,7 +46,7 @@ const getUserBalance = async (req, res) => {
 const updateUserBalance = async (req, res) => {
     try {
         const token = req.headers.token;
-        const { balance } = req.body;
+        const { balance , txn_id , description, txn_type } = req.body;
         let validateUser = await getRedis(token);
         try {
             validateUser = JSON.parse(validateUser);
@@ -62,25 +54,27 @@ const updateUserBalance = async (req, res) => {
             return res.status(400).send({ status: false, msg: "We've encountered an internal error" })
         }
         if (validateUser) {
-            const { userId, operatorId, secret  , url} = validateUser;
+            const { operatorId, secret, userId  , url} = validateUser;
             // let operatorBaseUrl = process.env.operator_base_url;
             let operatorBaseUrl = url;
-            let encryptedData = await encryption({ userId, balance }, secret);
+            let encryptedData = await encryption({ balance , txn_id , description, txn_type }, secret);
             const options = {
-                method: 'PUT',
+                method: 'POST',
                 url: `${operatorBaseUrl}/operator/user/balance`,
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    token
                 },
                 data: {
                     data: encryptedData
+                   
                 }
             };
             await axios(options).then(async data => {
                 // userId, balance , update , operatorId, url , data
                 // history transaction 
-               let sql = "INSERT INTO transaction (userId, balance, operatorId, url, data) VALUES (? ,?, ?, ? ,?)";
-                 await write.query(sql , [ userId, balance  , operatorId, url , JSON.stringify(data?.data)])
+               let sql = "INSERT INTO transaction (userId, balance, operatorId, data , txn_id ,  description, txn_type) VALUES (? ,?, ?, ? ,? , ?, ?)";
+                 await write.query(sql , [ userId, balance  , operatorId, JSON.stringify(data?.data) , txn_id , description, txn_type])
                 if (data.status === 200) {
                     return res.status(200).send( data.data);
                 } else {
@@ -89,9 +83,9 @@ const updateUserBalance = async (req, res) => {
                 }
             }).catch( async err => {
                 let data = err?.response?.data
-                let sql = "INSERT INTO transaction (userId, balance, operatorId, url, data) VALUES (? ,?, ?, ? ,?)";
-                await write.query(sql , [ userId, balance  , operatorId, url , JSON.stringify(data?.data)])
-                return res.status(500).send( {...data , code : 401} );
+                let sql = "INSERT INTO transaction (userId, balance, operatorId, data,  txn_id ,  description, txn_type) VALUES (? ,?, ?, ? ,?,?,?)";
+                await write.query(sql , [ userId, balance  , operatorId, JSON.stringify(data?.data), txn_id , description, txn_type])
+                return res.status(500).send( {status:false , msg : "Internal Server error"} );
                // console.error(`[ERR] while updating user balance from operator is::`, JSON.stringify(err))
                // return res.status(500).send({ status: false, msg: "We've encountered an internal error" });
             })

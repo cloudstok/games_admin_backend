@@ -4,8 +4,8 @@ const { serviceAddGame, serviceFindGame, getOperatorGame, getMasterListGames, ge
 const { addGame, findGame, getGameFromServiceProvider } = require('../controller/operator/game');
 const { getUserBalance, updateUserBalance } = require('../controller/service/wallet');
 const { verifyToken } = require('../utilities/jwt/jsonwebtoken');
-const { activeUser } = require('../controller/service/user');
-const { add_webhook, get_webhook, webhook } = require('../controller/service/webHook');
+const { activeUser, getuserDetail } = require('../controller/service/user');
+const { getransaction } = require('../controller/service/transaction');
 
 const serviceRouter = require('express').Router();
 
@@ -25,8 +25,14 @@ serviceRouter.get('/operator/game', getOperatorGame);
 serviceRouter.post('/user/login/:id', userLogin);
 
 //Call to Operator's API
-serviceRouter.get('/operator/user/balance', getUserBalance);
-serviceRouter.put('/operator/user/balance', updateUserBalance);
+serviceRouter.get('/operator/user/balance', getUserBalance);//
+serviceRouter.post('/operator/user/balance', updateUserBalance);
+serviceRouter.get('/user/detail', getuserDetail);
+
+
+
+
+serviceRouter.get('/transaction/detail', getransaction);
 
 // webhook
 serviceRouter.post('/webhook', add_webhook);

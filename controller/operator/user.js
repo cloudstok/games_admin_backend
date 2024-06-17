@@ -3,7 +3,8 @@ const axios = require('axios');
 const { generateRandomUserId, generateRandomString } = require("../../utilities/common_function");
 const { hashPassword, compare } = require("../../utilities/bcrypt/bcrypt");
 const { encryption, decryption } = require('../../utilities/ecryption-decryption');
-const jwt = require('jsonwebtoken')
+const jwt = require('jsonwebtoken');
+const { getRedis } = require("../../redis/connection");
 const addUser = async (req, res) => {
     try {
         const { id } = req.operator.user;
@@ -24,14 +25,13 @@ const addUser = async (req, res) => {
 
 const userLogin = async (req, res) => {
     try {
-
         // const { pub_key, secret } = req.operator.user;
         const [getOperator] = await write.query(`SELECT * FROM operator WHERE user_type = 'operator' and is_deleted = 0 LIMIT 1`);
         const { pub_key, secret } = getOperator[0];
         const { userId, password } = req.body;
         const [getUser] = await write.query(`SELECT * FROM user WHERE user_id = ?`, [userId]);
 
-        const [[wallet]] = await write.query(`SELECT * FROM user_wallet WHERE user_id = ?`, [userId]);
+        //const [[wallet]] = await write.query(`SELECT * FROM user_wallet WHERE user_id = ?`, [userId]);
         if (getUser.length > 0) {
             const checkPassword = await compare(password, getUser[0].password)
             if (!checkPassword) {
@@ -39,7 +39,7 @@ const userLogin = async (req, res) => {
             }
             const { user_id, name, profile_url, currency_prefrence } = getUser[0];
          
-                const {balance} = wallet
+              //  const {balance} = wallet
             
 
           
@@ -59,16 +59,16 @@ const userLogin = async (req, res) => {
                     data: encryptedData
                 }
             };
+            // console.log(options , "options")
             await axios(options).then(data => {
                 if (data.status === 200) {
-                    return res.status(200).send({  ...data.data , user_id, name,balance ,avatar : "dfdfd" });
+                    return res.status(200).send({  ...data.data});
                 } 
                 else {
                     console.log(`received an invalid response from upstream server`);
                     return res.status(data.status).send({ status: false, msg: `Request failed from upstream server with response:: ${JSON.stringify(data)}` })
                 }
             }).catch(err => {
-
                 let data = err?.response?.data
                 return res.status(401).send( {...data , code : 401} );
              //   return res.status(401).send(err.response.data);
@@ -121,4 +121,25 @@ const updateUser = async (req, res) => {
 
 
 
-module.exports = { addUser, userLogin, getUser }
+const getuserDetail = async(req ,res)=>{
+    try{
+        const token = req.headers.token;
+        let validateUser = await getRedis(token);
+        try {
+            validateUser = JSON.parse(validateUser);
+        } catch (err) {
+            return res.status(400).send({ status: false, msg: "We've encountered an internal error" })
+        }
+        const { userId } = validateUser;
+        // const [[getOperator]] = await write.query(`SELECT secret FROM operator WHERE user_id = ?`, [operatorId]);
+        //    const data = await decryption(req.body.data , getOperator.secret)
+        let sql = "SELECT  u.name,  u.user_id,  w.balance,  u.profile_url AS avatar FROM  games_admin.user as u INNER JOIN  user_wallet as w ON u.user_id = w.user_id where u.user_id = ?";
+         const [[user]] = await read.query(sql , [userId])
+         return res.status(200).send({ status: true, msg: "get detail" ,user })
+    }catch(err){
+        console.error(err);
+        return res.status(500).json({ msg: "Internal server Error", status: false })
+    }
+}
+
+module.exports = { addUser, userLogin, getUser  , getuserDetail}
