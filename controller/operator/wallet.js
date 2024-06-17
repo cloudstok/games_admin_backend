@@ -1,5 +1,6 @@
 
 const { read, write } = require("../../db_config/db");
+const { getRedis } = require("../../redis/connection");
 const { decryption } = require("../../utilities/ecryption-decryption");
 const addWallet = async (req, res) => {
     try {
@@ -36,10 +37,8 @@ const AllWallet = async (req, res) => {
 
 const userBalance = async (req, res) => {
     try {
-        // console.log(req.headers.host);
         const { data } = req.body;
         const [getOperator] = await write.query(`SELECT secret FROM operator WHERE url = ?`, ['http://' + req.headers.host]);
-           console.log(getOperator , "operator")
         if (getOperator.length > 0) {
             const { secret } = getOperator[0];
             const { userId } = await decryption(data, secret);
@@ -62,11 +61,18 @@ const updateBalance = async (req, res) => {
     try {
         // const { operator_id } = req.params;
         const { data } = req.body;
-        const [getOperator] = await write.query(`SELECT secret FROM operator WHERE url = ?`, ['http://' + req.headers.host]);
-        console.log(getOperator , "getOperator")
+        const token = req.headers.token;
+        let validateUser = await getRedis(token);
+        try {
+            validateUser = JSON.parse(validateUser);
+        } catch (err) {
+            return res.status(400).send({ status: false, msg: "We've encountered an internal error" })
+        }
+        let {operatorId, userId}= validateUser;
+       const [getOperator] = await write.query("SELECT secret FROM operator WHERE user_id = ?"  , [operatorId] );
         if (getOperator.length > 0) {
             const { secret } = getOperator[0];
-            const { userId, balance } = await decryption(data, secret);
+            const { balance ,txn_id, description } = await decryption(data, secret);
             const [updateUserBalance] = await write.query(`UPDATE user_wallet SET balance = ? WHERE user_id = ?`, [balance, userId]);
             if (updateUserBalance.affectedRows != 0) {
                 return res.status(200).send({ status: true, msg: "User balance updated successfully", balance });

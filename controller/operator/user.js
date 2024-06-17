@@ -62,14 +62,13 @@ const userLogin = async (req, res) => {
             // console.log(options , "options")
             await axios(options).then(data => {
                 if (data.status === 200) {
-                    return res.status(200).send({  ...data.data , user_id, name});
+                    return res.status(200).send({  ...data.data});
                 } 
                 else {
                     console.log(`received an invalid response from upstream server`);
                     return res.status(data.status).send({ status: false, msg: `Request failed from upstream server with response:: ${JSON.stringify(data)}` })
                 }
             }).catch(err => {
-
                 let data = err?.response?.data
                 return res.status(401).send( {...data , code : 401} );
              //   return res.status(401).send(err.response.data);
@@ -124,11 +123,19 @@ const updateUser = async (req, res) => {
 
 const getuserDetail = async(req ,res)=>{
     try{
-        const [[getOperator]] = await write.query(`SELECT secret FROM operator WHERE url = ?`, ['http://' + req.headers.host]);
-           const data = await decryption(req.body.data , getOperator.secret)
-        let sql = "SELECT  u.name,  u.user_id,  w.balance,  u.profile_url AS avatar FROM  games_admin.user u INNER JOIN  user_wallet w ON u.user_id = w.user_id where u.user_id = ?";
-         const [[user]] = await read.query(sql , [data.userId])
-         return res.status(200).send({ status: true, msg: "get  detail" ,user })
+        const token = req.headers.token;
+        let validateUser = await getRedis(token);
+        try {
+            validateUser = JSON.parse(validateUser);
+        } catch (err) {
+            return res.status(400).send({ status: false, msg: "We've encountered an internal error" })
+        }
+        const { userId } = validateUser;
+        // const [[getOperator]] = await write.query(`SELECT secret FROM operator WHERE user_id = ?`, [operatorId]);
+        //    const data = await decryption(req.body.data , getOperator.secret)
+        let sql = "SELECT  u.name,  u.user_id,  w.balance,  u.profile_url AS avatar FROM  games_admin.user as u INNER JOIN  user_wallet as w ON u.user_id = w.user_id where u.user_id = ?";
+         const [[user]] = await read.query(sql , [userId])
+         return res.status(200).send({ status: true, msg: "get detail" ,user })
     }catch(err){
         console.error(err);
         return res.status(500).json({ msg: "Internal server Error", status: false })

@@ -75,12 +75,15 @@ INSERT INTO operator (`name`, `user_id`, `password`, `pub_key`, `secret`, `user_
 
 insert into games_master_list (name, url, image) values('avaitor', 'https://aviator.ayodhya365.co/', 'https://jaunpur123.s3.ap-south-1.amazonaws.com/1717673785290_aviator-pic.jpg');
 
+
 CREATE TABLE transaction (
    id int primary key auto_increment,
     userId varchar(255) ,
     balance varchar(30),
     operatorId varchar(30),
-    url VARCHAR(255),
+     txn_id VARCHAR(255),
+    description varchar(255),
+    txn_type varchar(255),
     data TEXT,
 created_at timestamp default CURRENT_TIMESTAMP,
 updated_at timestamp default CURRENT_TIMESTAMP

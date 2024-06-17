@@ -11,12 +11,12 @@ operatorRouter.post('/game', serviceAddGame)
 operatorRouter.post('/wallet', addWallet)
 operatorRouter.get('/wallet/:user_id', findWallet)
 operatorRouter.get('/wallet', AllWallet)
-operatorRouter.post('/user/balance', userBalance);
-operatorRouter.put('/user/balance', updateBalance);
+operatorRouter.get('/user/balance', userBalance);
+operatorRouter.post('/user/balance', updateBalance);
 operatorRouter.get('/games/list', operatorFindGame);
 operatorRouter.get('/user/list', getUser);
 operatorRouter.get('/user/logout', logout);
-operatorRouter.post('/user/detail', getuserDetail);
+operatorRouter.get('/user/detail', getuserDetail);
 
 
 module.exports = { operatorRouter };

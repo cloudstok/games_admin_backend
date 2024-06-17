@@ -26,8 +26,12 @@ serviceRouter.post('/user/login/:id', userLogin);
 
 //Call to Operator's API
 serviceRouter.get('/operator/user/balance', getUserBalance);//
-serviceRouter.put('/operator/user/balance', updateUserBalance);
+serviceRouter.post('/operator/user/balance', updateUserBalance);
 serviceRouter.get('/user/detail', getuserDetail);
+
+
+
+
 serviceRouter.get('/transaction/detail', getransaction);
 
 module.exports = { serviceRouter };
