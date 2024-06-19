@@ -29,9 +29,9 @@ const webhook= async(req , res)=>{
 
 const get_webhook= async(req , res)=>{
     try{
-    
-        const sql = "SELECT * FROM webhook_config"
-        const [getWebhookDetails]= await write.query(sql);
+    const {limit , offset} = req.query
+        const sql = "SELECT * FROM webhook_config limit ? offset ?"
+        const [getWebhookDetails]= await write.query(sql , [+limit , +offset]);
         return res.status(200).send({ status: true, msg: "Webhook list fetched successfully", getWebhookDetails})
     }catch(err){
         console.error(`[Err] while trying to get user balance is:::`, err)

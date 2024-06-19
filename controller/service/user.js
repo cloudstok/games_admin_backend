@@ -4,6 +4,7 @@ const { encryption } = require("../../utilities/ecryption-decryption");
 const axios = require('axios');
 const activeUser = async (req, res) => {
     try {
+        // const{limit , offset} =  req.query
         //   await deleteRedis('users')
         const finalData = []
         let user = JSON.parse(await getRedis('users'))

@@ -4,9 +4,9 @@ const { read } = require("../../db_config/db");
 
 const getransaction = async (req, res) => {
     try {
-       
-        const sql = `SELECT * FROM transaction`
-        const [data] = await read.query(sql)
+       const {limit , offset} = req.query
+        const sql = `SELECT * FROM transaction limit ? offset ? `
+        const [data] = await read.query(sql , [+limit , +offset])
         return res.status(200).send({ status: true, msg: "Find transaction", data })
     } catch (er) {
         console.error(er);

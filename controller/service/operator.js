@@ -67,8 +67,10 @@ const register = async (req, res) => {
 
 const getOperatorList = async (req, res) => {
   try {
+  const{limit , offset} =  req.query
+
     if (req.operator?.user?.user_type === 'admin') {
-      const [operatorList] = await write.query(`SELECT  * FROM operator where user_type = 'operator' and is_deleted = 0`);
+      const [operatorList] = await write.query(`SELECT  * FROM operator where user_type = 'operator' and is_deleted = 0 limit ? offset ?` , [+limit , +offset]);
       return res.status(200).send({ status: true, msg: "Operators list fetched successfully", data: operatorList });
     } else {
       return res.status(401).send({ status: false, msg: "User not authorized to perform the operation" });

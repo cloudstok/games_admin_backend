@@ -68,8 +68,9 @@ const serviceAddGame = async (req, res) => {
 
 const getMasterListGames = async (req, res) => {
     try {
+        const{limit , offset} =  req.query
         if (req.operator?.user?.user_type === 'admin') {
-            const [gamesList] = await write.query(`SELECT * FROM games_master_list WHERE is_active = 1`);
+            const [gamesList] = await write.query(`SELECT * FROM games_master_list WHERE is_active = 1  limit ? offset ?` , [+limit , +offset]);
             return res.status(200).send({ status: true, msg: "Games list fetched successfully", gamesList });
         } else {
             return res.status(401).send({ status: false, msg: "User not authorized to perform the operation" });
