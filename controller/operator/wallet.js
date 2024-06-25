@@ -6,7 +6,7 @@ const addWallet = async (req, res) => {
     try {
         const { user_id } = req.body
         await write.query("insert IGNORE into user_wallet (user_id ,balance) value(? , ?)", [user_id, '3000.00'])
-        await write.query("update user set is_wallet = ? where  user_id  = ?", [true ,  user_id])
+        await write.query("update user set is_wallet = ? where  user_id  = ?", [true, user_id])
         return res.status(200).send({ status: true, msg: "Wallet Add successfully to master's list" })
     } catch (err) {
         console.log(err)
@@ -27,7 +27,12 @@ const findWallet = async (req, res) => {
 
 const AllWallet = async (req, res) => {
     try {
-        const [data] = await write.query("SELECT * FROM user inner join user_wallet on user.user_id = user_wallet.user_id;")
+        let  { limit, offset } = req.query
+        if (!(limit && offset)) {
+            limit = 100
+            offset = 0
+        }
+        const [data] = await write.query("SELECT * FROM user inner join user_wallet on user.user_id = user_wallet.user_id limit  ?  offset ?", [+limit, +offset])
         return res.status(200).send({ status: true, data })
     } catch (er) {
         console.log(er)
@@ -68,11 +73,11 @@ const updateBalance = async (req, res) => {
         } catch (err) {
             return res.status(400).send({ status: false, msg: "We've encountered an internal error" })
         }
-        let {operatorId, userId}= validateUser;
-       const [getOperator] = await write.query("SELECT secret FROM operator WHERE user_id = ?"  , [operatorId] );
+        let { operatorId, userId } = validateUser;
+        const [getOperator] = await write.query("SELECT secret FROM operator WHERE user_id = ?", [operatorId]);
         if (getOperator.length > 0) {
             const { secret } = getOperator[0];
-            const { balance ,txn_id, description } = await decryption(data, secret);
+            const { balance, txn_id, description } = await decryption(data, secret);
             const [updateUserBalance] = await write.query(`UPDATE user_wallet SET balance = ? WHERE user_id = ?`, [balance, userId]);
             if (updateUserBalance.affectedRows != 0) {
                 return res.status(200).send({ status: true, msg: "User balance updated successfully", balance });

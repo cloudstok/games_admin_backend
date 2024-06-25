@@ -38,11 +38,11 @@ const userLogin = async (req, res) => {
                 return res.status(401).json({ status: false, msg: "Missing or Incorrect Credentials" });
             }
             const { user_id, name, profile_url, currency_prefrence } = getUser[0];
-         
-              //  const {balance} = wallet
-            
 
-          
+            //  const {balance} = wallet
+
+
+
 
             const reqTime = Date.now();
             let encryptedData = await encryption({ user_id, name, profile_url, currency_prefrence, reqTime }, secret);
@@ -62,18 +62,18 @@ const userLogin = async (req, res) => {
             // console.log(options , "options")
             await axios(options).then(data => {
                 if (data.status === 200) {
-                    return res.status(200).send({  ...data.data});
-                } 
+                    return res.status(200).send({ ...data.data });
+                }
                 else {
                     console.log(`received an invalid response from upstream server`);
                     return res.status(data.status).send({ status: false, msg: `Request failed from upstream server with response:: ${JSON.stringify(data)}` })
                 }
             }).catch(err => {
                 let data = err?.response?.data
-                return res.status(401).send( {...data , code : 401} );
-             //   return res.status(401).send(err.response.data);
-              //  console.error(`[ERR] while getting game data from service provider is::`, JSON.stringify(err))
-              //  return res.status(500).send({ status: false, msg: "We've encountered an internal error" });
+                return res.status(401).send({ ...data, code: 401 });
+                //   return res.status(401).send(err.response.data);
+                //  console.error(`[ERR] while getting game data from service provider is::`, JSON.stringify(err))
+                //  return res.status(500).send({ status: false, msg: "We've encountered an internal error" });
             })
 
         } else {
@@ -88,13 +88,18 @@ const userLogin = async (req, res) => {
 
 const getUser = async (req, res) => {
     try {
+        let  { limit, offset } = req.query
+        if (!(limit && offset)) {
+            limit = 100
+            offset = 0
+        }
         const tokenHeader = req.headers.authorization;
         const token = tokenHeader.split(" ")[1];
         const verifiedToken = jwt.verify(token, process.env.jwtSecretKey);
 
         verifiedToken.user.id
-        const sql = `SELECT * FROM user where  operator_id =${verifiedToken.user.id} and is_deleted = 0`
-        const [data] = await read.query(sql)
+        const sql = `SELECT * FROM user where  operator_id = ? and is_deleted = 0 limit ? offset ?`
+        const [data] = await read.query(sql, [verifiedToken.user.id, +limit, +offset])
         return res.status(200).send({ status: true, msg: "Find data", data })
     } catch (er) {
         console.error(er);
@@ -121,8 +126,8 @@ const updateUser = async (req, res) => {
 
 
 
-const getuserDetail = async(req ,res)=>{
-    try{
+const getuserDetail = async (req, res) => {
+    try {
         const token = req.headers.token;
         let validateUser = await getRedis(token);
         try {
@@ -134,12 +139,12 @@ const getuserDetail = async(req ,res)=>{
         // const [[getOperator]] = await write.query(`SELECT secret FROM operator WHERE user_id = ?`, [operatorId]);
         //    const data = await decryption(req.body.data , getOperator.secret)
         let sql = "SELECT  u.name,  u.user_id,  w.balance,  u.profile_url AS avatar FROM  games_admin.user as u INNER JOIN  user_wallet as w ON u.user_id = w.user_id where u.user_id = ?";
-         const [[user]] = await read.query(sql , [userId])
-         return res.status(200).send({ status: true, msg: "get detail" ,user })
-    }catch(err){
+        const [[user]] = await read.query(sql, [userId])
+        return res.status(200).send({ status: true, msg: "get detail", user })
+    } catch (err) {
         console.error(err);
         return res.status(500).json({ msg: "Internal server Error", status: false })
     }
 }
 
-module.exports = { addUser, userLogin, getUser  , getuserDetail}
+module.exports = { addUser, userLogin, getUser, getuserDetail }
