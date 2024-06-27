@@ -34,7 +34,7 @@ const getUserBalance = async (req, res) => {
                         return res.status(data.status).send({ status: false, msg: `Request failed from upstream server with response:: ${JSON.stringify(data)}` })
                     }
                 }).catch(err => {
-                    return res.status(401).send(err?.response?.data);
+                    return res.status(400).send(err?.response?.data);
                 })
             }else{
                 return res.status(400).send({ status: false, msg: "No URL configured for the event"});
@@ -51,7 +51,7 @@ const getUserBalance = async (req, res) => {
 const updateUserBalance = async (req, res) => {
     try {
         const token = req.headers.token;
-        const { balance , txn_id , description, txn_type } = req.body;
+        const { amount , txn_id , description, txn_type } = req.body;
         let validateUser = await getRedis(token);
         try {
             validateUser = JSON.parse(validateUser);
@@ -61,7 +61,7 @@ const updateUserBalance = async (req, res) => {
         if (validateUser) {
             const { operatorId, secret, userId} = validateUser;
             const operatorUrl = await getWebhookUrl(operatorId, "UPDATE_BALANCE");
-            let encryptedData = await encryption({ balance , txn_id , description, txn_type }, secret);
+            let encryptedData = await encryption({ amount , txn_id , description, txn_type }, secret);
             if(operatorUrl){
                 const options = {
                     method: 'POST',
@@ -79,7 +79,7 @@ const updateUserBalance = async (req, res) => {
                     // userId, balance , update , operatorId, url , data
                     // history transaction 
                    let sql = "INSERT INTO transaction (userId, balance, operatorId, data , txn_id ,  description, txn_type) VALUES (? ,?, ?, ? ,? , ?, ?)";
-                     await write.query(sql , [ userId, balance  , operatorId, JSON.stringify(data?.data) , txn_id , description, txn_type])
+                     await write.query(sql , [ userId, amount  , operatorId, JSON.stringify(data?.data) , txn_id , description, txn_type])
                     if (data.status === 200) {
                         return res.status(200).send( data.data);
                     } else {
@@ -89,7 +89,7 @@ const updateUserBalance = async (req, res) => {
                 }).catch( async err => {
                     let data = err?.response?.data
                     let sql = "INSERT INTO transaction (userId, balance, operatorId, data,  txn_id ,  description, txn_type) VALUES (? ,?, ?, ? ,?,?,?)";
-                    await write.query(sql , [ userId, balance  , operatorId, JSON.stringify(data?.data), txn_id , description, txn_type])
+                    await write.query(sql , [ userId, amount  , operatorId, JSON.stringify(data?.data), txn_id , description, txn_type])
                     return res.status(500).send( {status:false , msg : "Internal Server error"} );
                    // console.error(`[ERR] while updating user balance from operator is::`, JSON.stringify(err))
                    // return res.status(500).send({ status: false, msg: "We've encountered an internal error" });

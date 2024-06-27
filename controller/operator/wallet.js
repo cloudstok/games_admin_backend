@@ -77,10 +77,16 @@ const updateBalance = async (req, res) => {
         const [getOperator] = await write.query("SELECT secret FROM operator WHERE user_id = ?", [operatorId]);
         if (getOperator.length > 0) {
             const { secret } = getOperator[0];
-            const { balance, txn_id, description } = await decryption(data, secret);
-            const [updateUserBalance] = await write.query(`UPDATE user_wallet SET balance = ? WHERE user_id = ?`, [balance, userId]);
+            const { amount, txn_id, description, txn_type } = await decryption(data, secret);
+            let query = '';
+            if(txn_type == "CREDIT"){
+                query = `UPDATE user_wallet SET balance = balance + ? WHERE user_id = ?`;
+            }else{
+                query = `UPDATE user_wallet SET balance = balance - ? WHERE user_id = ?`;
+            }
+            const [updateUserBalance] = await write.query(query, [amount, userId]);
             if (updateUserBalance.affectedRows != 0) {
-                return res.status(200).send({ status: true, msg: "User balance updated successfully", balance });
+                return res.status(200).send({ status: true, msg: "User balance updated successfully" });
             } else {
                 return res.status(400).send({ status: false, msg: "Unable to update user balance" });
             }
