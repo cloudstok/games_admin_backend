@@ -73,7 +73,6 @@ const getUserDetail = async (req, res) => {
                         token
                     }
                 };
-    
                 await axios(options).then(data => {
                     if (data.status === 200) {
                         return res.status(200).send(data.data);
@@ -82,7 +81,7 @@ const getUserDetail = async (req, res) => {
                         return res.status(data.status).send({ status: false, msg: `Request failed from upstream server with response:: ${JSON.stringify(data)}` })
                     }
                 }).catch(err => {
-                    return res.status(401).send(err?.response?.data);
+                    return res.status(400).send(err?.response?.data);
                 })
             }else{
                 return res.status(400).send({ status: false, msg: "No URL configured for the event"});
