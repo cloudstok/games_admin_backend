@@ -51,7 +51,7 @@ const getUserBalance = async (req, res) => {
 const updateUserBalance = async (req, res) => {
     try {
         const token = req.headers.token;
-        const { amount , txn_id , description, txn_type } = req.body;
+        const { amount , txn_id , description, txn_ref_id, txn_type } = req.body;
         let validateUser = await getRedis(token);
         try {
             validateUser = JSON.parse(validateUser);
@@ -61,7 +61,7 @@ const updateUserBalance = async (req, res) => {
         if (validateUser) {
             const { operatorId, secret, userId } = validateUser;
             const operatorUrl = await getWebhookUrl(operatorId, "UPDATE_BALANCE");
-            let encryptedData = await encryption({ amount , txn_id , description, txn_type }, secret);
+            let encryptedData = await encryption({ amount , txn_id , description, txn_type, txn_ref_id }, secret);
             if(operatorUrl){
                 const options = {
                     method: 'POST',
