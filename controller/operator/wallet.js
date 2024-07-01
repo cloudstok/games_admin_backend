@@ -27,7 +27,7 @@ const findWallet = async (req, res) => {
 
 const AllWallet = async (req, res) => {
     try {
-        let  { limit, offset } = req.query
+        let { limit, offset } = req.query
         if (!(limit && offset)) {
             limit = 100
             offset = 0
@@ -77,11 +77,16 @@ const updateBalance = async (req, res) => {
         const [getOperator] = await write.query("SELECT secret FROM operator WHERE user_id = ?", [operatorId]);
         if (getOperator.length > 0) {
             const { secret } = getOperator[0];
-            const { amount, txn_id, description, txn_type } = await decryption(data, secret);
+            let { amount, txn_id, description, txn_type, txn_ref_id } = await decryption(data, secret);
+            if (txn_ref_id && txn_type == "CREDIT"){
+                 const[[{balance}]] =  await read.query("SELECT balance FROM transaction where txn_id = ? limit 1" , [txn_ref_id])
+                 amount +=balance
+            }
+                
             let query = '';
-            if(txn_type == "CREDIT"){
+            if (txn_type == "CREDIT") {
                 query = `UPDATE user_wallet SET balance = balance + ? WHERE user_id = ?`;
-            }else{
+            } else {
                 query = `UPDATE user_wallet SET balance = balance - ? WHERE user_id = ?`;
             }
             const [updateUserBalance] = await write.query(query, [amount, userId]);
