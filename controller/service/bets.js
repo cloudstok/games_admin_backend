@@ -3,7 +3,9 @@ const axios = require('axios');
 
 const bets = async (req, res)=>{
     try{
-      let {data} = await axios.get(process.env.bets_base_url)
+       const {limit , offset} = req.query
+       console.log({limit , offset})
+      let {data} = await axios.get(`${process.env.bets_base_url}?limit=${limit}&offset=${offset}`);
          return res.status(200).send({statu : true , msg : "Find Data" , data : data.data  })
     }catch(er){
         console.error(er);
