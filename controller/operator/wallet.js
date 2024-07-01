@@ -77,14 +77,14 @@ const updateBalance = async (req, res) => {
         const [getOperator] = await write.query("SELECT secret FROM operator WHERE user_id = ?", [operatorId]);
         if (getOperator.length > 0) {
             const { secret } = getOperator[0];
-            let { amount, txn_id, description, txn_type, txn_ref_id } = await decryption(data, secret);
-            if (txn_ref_id && txn_type == "CREDIT"){
-                 const[[{balance}]] =  await read.query("SELECT balance FROM transaction where txn_id = ? limit 1" , [txn_ref_id])
-                 amount +=balance
+            let { amount, txn_type, txn_ref_id } = await decryption(data, secret);
+            if (txn_type === 1){
+                 let [[{balance}]] =  await read.query("SELECT balance FROM transaction where txn_id = ? limit 1" , [txn_ref_id]);
+                 amount = +amount + +balance;
             }
                 
             let query = '';
-            if (txn_type == "CREDIT") {
+            if (txn_type === 1) {
                 query = `UPDATE user_wallet SET balance = balance + ? WHERE user_id = ?`;
             } else {
                 query = `UPDATE user_wallet SET balance = balance - ? WHERE user_id = ?`;
