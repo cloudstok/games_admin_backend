@@ -7,7 +7,7 @@ const { verifyToken } = require('../utilities/jwt/jsonwebtoken');
 const { activeUser, getuserDetail, getUserDetail } = require('../controller/service/user');
 const { getransaction } = require('../controller/service/transaction');
 const serviceRouter = require('express').Router();
-const {add_webhook, get_webhook, webhook} = require('../controller/service/webhook');
+const { add_webhook, get_webhook, webhook } = require('../controller/service/webhook');
 const { bets } = require('../controller/service/bets');
 
 
@@ -31,7 +31,7 @@ serviceRouter.post('/operator/user/balance', updateUserBalance);
 serviceRouter.get('/user/detail', getUserDetail);
 
 // bets 
- serviceRouter.get('/bets' , bets)
+serviceRouter.get('/bets', bets)
 
 
 serviceRouter.get('/transaction/detail', getransaction);

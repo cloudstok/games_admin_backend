@@ -16,7 +16,7 @@ const getUserBalance = async (req, res) => {
         if (validateUser) {
             const { operatorId } = validateUser;
             let operatorUrl = await getWebhookUrl(operatorId, "GET_BALANCE")
-            if(operatorUrl){
+            if (operatorUrl) {
                 const options = {
                     method: 'GET',
                     url: operatorUrl,
@@ -25,10 +25,10 @@ const getUserBalance = async (req, res) => {
                         token
                     }
                 };
-              
+
                 await axios(options).then(data => {
                     if (data.status === 200) {
-                        return res.status(200).send( data.data );
+                        return res.status(200).send(data.data);
                     } else {
                         console.log(`received an invalid response from upstream server`);
                         return res.status(data.status).send({ status: false, msg: `Request failed from upstream server with response:: ${JSON.stringify(data)}` })
@@ -36,8 +36,8 @@ const getUserBalance = async (req, res) => {
                 }).catch(err => {
                     return res.status(401).send(err?.response?.data);
                 })
-            }else{
-                return res.status(400).send({ status: false, msg: "No URL configured for the event"});
+            } else {
+                return res.status(400).send({ status: false, msg: "No URL configured for the event" });
             }
         } else {
             return res.status(400).send({ status: false, msg: "Invalid Token or session timed out" });
@@ -51,7 +51,7 @@ const getUserBalance = async (req, res) => {
 const updateUserBalance = async (req, res) => {
     try {
         const token = req.headers.token;
-        const { balance , txn_id , description, txn_type } = req.body;
+        const { balance, txn_id, description, txn_type } = req.body;
         let validateUser = await getRedis(token);
         try {
             validateUser = JSON.parse(validateUser);
@@ -59,10 +59,10 @@ const updateUserBalance = async (req, res) => {
             return res.status(400).send({ status: false, msg: "We've encountered an internal error" })
         }
         if (validateUser) {
-            const { operatorId, secret, userId} = validateUser;
+            const { operatorId, secret, userId } = validateUser;
             const operatorUrl = await getWebhookUrl(operatorId, "UPDATE_BALANCE");
-            let encryptedData = await encryption({ balance , txn_id , description, txn_type }, secret);
-            if(operatorUrl){
+            let encryptedData = await encryption({ balance, txn_id, description, txn_type }, secret);
+            if (operatorUrl) {
                 const options = {
                     method: 'POST',
                     url: operatorUrl,
@@ -72,30 +72,34 @@ const updateUserBalance = async (req, res) => {
                     },
                     data: {
                         data: encryptedData
-                       
+
                     }
                 };
                 await axios(options).then(async data => {
                     // userId, balance , update , operatorId, url , data
                     // history transaction 
-                   let sql = "INSERT INTO transaction (userId, balance, operatorId, data , txn_id ,  description, txn_type) VALUES (? ,?, ?, ? ,? , ?, ?)";
-                     await write.query(sql , [ userId, balance  , operatorId, JSON.stringify(data?.data) , txn_id , description, txn_type])
+                    const sql_transaction = "INSERT INTO transaction (userId, balance, operatorId, data , txn_id ,  description, txn_type) VALUES (? ,?, ?, ? ,? , ?, ?)";
+                    await write.query(sql_transaction, [userId, balance, operatorId, JSON.stringify(data?.data), txn_id, description, txn_type])
                     if (data.status === 200) {
-                        return res.status(200).send( data.data);
+                        return res.status(200).send(data.data);
                     } else {
                         console.log(`received an invalid response from upstream server`);
                         return res.status(data.status).send({ status: false, msg: `Request failed from upstream server with response:: ${JSON.stringify(data)}` })
                     }
-                }).catch( async err => {
+                }).catch(async err => {
                     let data = err?.response?.data
-                    let sql = "INSERT INTO transaction (userId, balance, operatorId, data,  txn_id ,  description, txn_type) VALUES (? ,?, ?, ? ,?,?,?)";
-                    await write.query(sql , [ userId, balance  , operatorId, JSON.stringify(data?.data), txn_id , description, txn_type])
-                    return res.status(500).send( {status:false , msg : "Internal Server error"} );
-                   // console.error(`[ERR] while updating user balance from operator is::`, JSON.stringify(err))
-                   // return res.status(500).send({ status: false, msg: "We've encountered an internal error" });
+                    const sql_transaction = "INSERT INTO transaction (userId, balance, operatorId, data,  txn_id ,  description, txn_type) VALUES (? ,?, ?, ? ,?,?,?)";
+
+                    const sql_rollback_detail = "INSERT INTO rollback_detail (game_url, options) VALUES (?, ?, ? , ?)"
+
+                    await write.query(sql_transaction, [userId, balance, operatorId, JSON.stringify(data?.data), txn_id, description, txn_type])
+                    await write.query(sql_rollback_detail, [req.url, options])
+                    return res.status(500).send({ status: false, msg: "Internal Server error" });
+                    console.error(`[ERR] while updating user balance from operator is::`, JSON.stringify(err))
+                    // return res.status(500).send({ status: false, msg: "We've encountered an internal error" });
                 })
-             }else{
-                return res.status(400).send({ status: false, msg: "No URL configured for the event"});
+            } else {
+                return res.status(400).send({ status: false, msg: "No URL configured for the event" });
             }
         } else {
             return res.status(401).send({ status: false, msg: "Invalid Token or session timed out" });

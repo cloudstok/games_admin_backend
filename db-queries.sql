@@ -1,4 +1,4 @@
- drop database if exists `games_admin`;
+drop database if exists `games_admin`;
 create database if not exists `games_admin`;
 use `games_admin`;
 
@@ -97,3 +97,17 @@ webhook_url VARCHAR(255),
 created_at timestamp default CURRENT_TIMESTAMP,
 updated_at timestamp default CURRENT_TIMESTAMP
 );
+
+
+create table rollback_detail(
+id int primary key auto_increment ,
+game_url varchar(255),
+options json,
+retry int default 0,
+trx_status enum('0','1','2') default '1',
+created_at timestamp default current_timestamp,
+updated_at timestamp on update current_timestamp
+)
+
+
+ALTER TABLE `games_admin`.`transaction` CHANGE COLUMN `txn_type` `txn_type` enum('0','1','2') NULL DEFAULT '0' ;
