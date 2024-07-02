@@ -82,7 +82,7 @@ const updateBalance = async (req, res) => {
                  let [[data]] =  await read.query("SELECT balance FROM transaction where txn_id = ? limit 1" , [txn_ref_id]);
                  if (data && data.balance !== undefined) {
                     amount = +amount + +data.balance;
-                }
+                }   
                 
             }
                 

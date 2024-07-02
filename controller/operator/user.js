@@ -40,10 +40,6 @@ const userLogin = async (req, res) => {
             const { user_id, name, profile_url, currency_prefrence } = getUser[0];
 
             //  const {balance} = wallet
-
-
-
-
             const reqTime = Date.now();
             let encryptedData = await encryption({ user_id, name, profile_url, currency_prefrence, reqTime }, secret);
             const { service_provider_url } = process.env;

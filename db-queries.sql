@@ -98,13 +98,15 @@ values
 
 CREATE TABLE transaction (
     id int primary key auto_increment,
-    userId varchar(255),
-    balance varchar(30),
-    operatorId varchar(30),
+    user_id varchar(255),
+    session_token varchar(255),
+    operator_id varchar(30),
     txn_id VARCHAR(255) unique not null,
+    amount varchar(30),
+    txn_ref_id varchar(255) default null, 
     description varchar(255),
-    txn_type enum('0', '1', '2') NULL DEFAULT '0',
-    data TEXT,
+    txn_type enum('0', '1', '2'),
+    txn_status enum('0', '1', '2') default '1',
     created_at timestamp default CURRENT_TIMESTAMP,
     updated_at timestamp default CURRENT_TIMESTAMP
 );
@@ -118,13 +120,14 @@ CREATE TABLE webhook_config (
     updated_at timestamp default CURRENT_TIMESTAMP
 );
 
-create table rollback_detail(
+
+create table pending_transactions(
     id int primary key auto_increment,
+    transaction_id int,
     backend_base_url varchar(255),
     options json,
     retry int default 0,
-    trx_status enum(0, 1, 2) default 1,
+    status enum('0', '1', '2') default '1',
     created_at timestamp default current_timestamp,
     updated_at timestamp on update current_timestamp
 );
--- ALTER TABLE`games_admin`.`transaction` CHANGE COLUMN `txn_type` `txn_type` enum('0', '1', '2') NULL DEFAULT '0';

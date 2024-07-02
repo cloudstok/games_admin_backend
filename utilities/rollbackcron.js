@@ -2,8 +2,8 @@ const axios = require('axios');
 const cron = require('node-cron');
 const { read } = require('../db_config/db');
 
-const getQuery = "SELECT id, game_url, options, retry, trx_status FROM rollback_detail WHERE trx_status = 1 AND retry < 11";
-const updateQuery = "UPDATE rollback_detail SET retry = retry + 1, trx_status = ? WHERE id = ?";
+const getQuery = "SELECT id, game_url, options, retry, trx_status FROM pending_transactions WHERE trx_status = 1 AND retry < 11";
+const updateQuery = "UPDATE pending_transactions SET retry = retry + 1, trx_status = ? WHERE id = ?";
 
 
 

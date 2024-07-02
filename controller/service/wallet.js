@@ -51,8 +51,8 @@ const getUserBalance = async (req, res) => {
 const updateUserBalance = async (req, res) => {
     try {
         const token = req.headers.token;
-        let { amount , txn_id , description, txn_ref_id, txn_type } = req.body;
-        txn_type= ''+txn_type
+        let { amount, txn_id, description, txn_ref_id, txn_type } = req.body;
+        txn_type = '' + txn_type
         let validateUser = await getRedis(token);
         try {
             validateUser = JSON.parse(validateUser);
@@ -62,8 +62,8 @@ const updateUserBalance = async (req, res) => {
         if (validateUser) {
             const { operatorId, secret, userId } = validateUser;
             const operatorUrl = await getWebhookUrl(operatorId, "UPDATE_BALANCE");
-            let encryptedData = await encryption({ amount , txn_id , description, txn_type, txn_ref_id }, secret);
-            if(operatorUrl){
+            let encryptedData = await encryption({ amount, txn_id, description, txn_type, txn_ref_id }, secret);
+            if (operatorUrl) {
                 const options = {
                     method: 'POST',
                     url: operatorUrl,
@@ -77,34 +77,24 @@ const updateUserBalance = async (req, res) => {
                     }
                 };
                 await axios(options).then(async data => {
-                   let sql = "INSERT INTO transaction (userId, balance, operatorId, data , txn_id ,  description, txn_type) VALUES (? ,?, ?, ? ,? , ?, ?)";
-                     await write.query(sql , [ userId, amount  , operatorId, JSON.stringify(data?.data) , txn_id , description, txn_type])
-                     console.log()
+                    //here insert data in to transaction
+                    // await rollback( [req.url, JSON.stringify(options)])
                     if (data.status === 200) {
-                        // console.log("roolback" )
-                        // if(txn_type == 1){
-                        //     const sql_rollback_detail =  "INSERT INTO rollback_detail (backend_base_url, options) VALUES ( ? , ?)"
-                        //     await write.query(sql_rollback_detail , [req.url , options])
-                        // }
+                    await transaction([userId, token , operatorId, txn_id, amount,  txn_ref_id , description, txn_type, 2]);
+
                         return res.status(200).send(data.data);
                     } else {
                         // here store data for rollback 
-                        console.log("roolback" )
-                        if(txn_type == 1){
-                            const sql_rollback_detail =  "INSERT INTO rollback_detail (backend_base_url, options) VALUES ( ? , ?)"
-                            await write.query(sql_rollback_detail , [req.url , options])
-                        }
-                       
+                        await transaction([userId, token , operatorId, txn_id, amount,  txn_ref_id , description, txn_type, 1]);
                         console.log(`received an invalid response from upstream server`);
                         return res.status(data.status).send({ status: false, msg: `Request failed from upstream server with response:: ${JSON.stringify(data)}` })
                     }
                 }).catch(async err => {
                     let data = err?.response?.data
-                    let sql = "INSERT INTO transaction (userId, balance, operatorId, data,  txn_id ,  description, txn_type) VALUES (? ,?, ?, ? ,?,?,?)";
-                    await write.query(sql , [ userId, amount  , operatorId, JSON.stringify(data?.data), txn_id , description, txn_type])
-                    return res.status(500).send( {status:false , msg : "Internal Server error"} );
-                   // console.error(`[ERR] while updating user balance from operator is::`, JSON.stringify(err))
-                   // return res.status(500).send({ status: false, msg: "We've encountered an internal error" });
+                    //here insert data in to transaction
+                 const transaction_id =  await transaction([userId, token , operatorId, txn_id, amount,  txn_ref_id , description, txn_type, 1]);
+                  await rollback( [ transaction_id ,  2, JSON.stringify(options)])
+                    return res.status(500).send({ status: false, msg: "Internal Server error" });
                 })
             } else {
                 return res.status(400).send({ status: false, msg: "No URL configured for the event" });
@@ -115,6 +105,25 @@ const updateUserBalance = async (req, res) => {
     } catch (err) {
         console.error(`[Err] while trying to update user balance is:::`, err)
         res.status(500).send({ status: false, msg: "Internal Server error" });
+    }
+}
+
+const transaction = async (data) => {
+    try {
+        let sql = "INSERT IGNORE INTO transaction (user_id, session_token , operator_id, txn_id, amount,  txn_ref_id , description, txn_type, txn_status) VALUES (?)";
+        await write.query(sql, [data])
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+const rollback = async (data) => {
+    try {
+        const sql_rollback_detail = "INSERT IGNORE INTO pending_transactions ( transaction_id , backend_base_url, options ) VALUES ( ? )"
+       const [{ InsertedId}]  = await write.query(sql_rollback_detail, [data])
+      return InsertedId
+    } catch (e) {
+        console.error(e);
     }
 }
 

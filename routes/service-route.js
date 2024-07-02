@@ -33,7 +33,6 @@ serviceRouter.get('/user/detail', getUserDetail);
 // bets 
 serviceRouter.get('/bets', bets)
 
-
 serviceRouter.get('/transaction/detail', getransaction);
 
 // webhook
