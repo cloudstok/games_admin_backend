@@ -1,3 +1,4 @@
+const { default: axios } = require("axios");
 const { read, write } = require("../../db_config/db");
 const { getRedis } = require("../../redis/connection");
 
@@ -81,6 +82,17 @@ const getMasterListGames = async (req, res) => {
         }
     } catch (err) {
         console.log(err)
+        return res.status(500).json({ msg: "Internal server Error", status: false })
+    }
+}
+
+
+const getGame = async(erq ,res)=>{
+    try{
+        const data =  await axios()
+
+    }catch(er){
+        console.log(er)
         return res.status(500).json({ msg: "Internal server Error", status: false })
     }
 }

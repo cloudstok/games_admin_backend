@@ -51,7 +51,8 @@ const getUserBalance = async (req, res) => {
 const updateUserBalance = async (req, res) => {
     try {
         const token = req.headers.token;
-        const { amount , txn_id , description, txn_ref_id, txn_type } = req.body;
+        let { amount , txn_id , description, txn_ref_id, txn_type } = req.body;
+        txn_type= ''+txn_type
         let validateUser = await getRedis(token);
         try {
             validateUser = JSON.parse(validateUser);
@@ -76,13 +77,24 @@ const updateUserBalance = async (req, res) => {
                     }
                 };
                 await axios(options).then(async data => {
-                    // userId, balance , update , operatorId, url , data
-                    // history transaction 
                    let sql = "INSERT INTO transaction (userId, balance, operatorId, data , txn_id ,  description, txn_type) VALUES (? ,?, ?, ? ,? , ?, ?)";
                      await write.query(sql , [ userId, amount  , operatorId, JSON.stringify(data?.data) , txn_id , description, txn_type])
+                     console.log()
                     if (data.status === 200) {
+                        console.log("roolback" )
+                        if(txn_type == 1){
+                            const sql_rollback_detail =  "INSERT INTO rollback_detail (backend_base_url, options) VALUES ( ? , ?)"
+                            await write.query(sql_rollback_detail , [req.url , options])
+                        }
                         return res.status(200).send(data.data);
                     } else {
+                        // here store data for rollback 
+                        console.log("roolback" )
+                        if(txn_type == 1){
+                            const sql_rollback_detail =  "INSERT INTO rollback_detail (backend_base_url, options) VALUES ( ? , ?)"
+                            await write.query(sql_rollback_detail , [req.url , options])
+                        }
+                       
                         console.log(`received an invalid response from upstream server`);
                         return res.status(data.status).send({ status: false, msg: `Request failed from upstream server with response:: ${JSON.stringify(data)}` })
                     }

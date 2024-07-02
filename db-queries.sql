@@ -37,7 +37,8 @@ CREATE TABLE `operator` (
 CREATE TABLE `games_master_list` (
     game_id int not null AUTO_INCREMENT,
     name varchar(60) unique not null,
-    url varchar(255) unique not null,
+    redirect_url varchar(255) unique ,
+    backend_base_url varchar(255) unique ,
     image varchar(255) default null,
     is_active boolean default true,
     created_at timestamp NULL DEFAULT CURRENT_TIMESTAMP,
@@ -87,7 +88,7 @@ values
 
 -- ALTER TABLE `user_wallet` CHANGE COLUMN `user_id` `user_id` VARCHAR(60) NOT NULL ;
 insert into
-    games_master_list (name, url, image)
+    games_master_list (name, redirect_url, image)
 values
 (
         'avaitor',
@@ -102,7 +103,7 @@ CREATE TABLE transaction (
     operatorId varchar(30),
     txn_id VARCHAR(255) unique not null,
     description varchar(255),
-    txn_type varchar(255),
+    txn_type enum('0', '1', '2') NULL DEFAULT '0',
     data TEXT,
     created_at timestamp default CURRENT_TIMESTAMP,
     updated_at timestamp default CURRENT_TIMESTAMP
@@ -119,12 +120,11 @@ CREATE TABLE webhook_config (
 
 create table rollback_detail(
     id int primary key auto_increment,
-    game_url varchar(255),
+    backend_base_url varchar(255),
     options json,
     retry int default 0,
-    trx_status enum('0', '1', '2') default '1',
+    trx_status enum(0, 1, 2) default 1,
     created_at timestamp default current_timestamp,
     updated_at timestamp on update current_timestamp
-)
-ALTER TABLE
-    `games_admin`.`transaction` CHANGE COLUMN `txn_type` `txn_type` enum('0', '1', '2') NULL DEFAULT '0';
+);
+-- ALTER TABLE`games_admin`.`transaction` CHANGE COLUMN `txn_type` `txn_type` enum('0', '1', '2') NULL DEFAULT '0';

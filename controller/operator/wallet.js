@@ -79,8 +79,11 @@ const updateBalance = async (req, res) => {
             const { secret } = getOperator[0];
             let { amount, txn_type, txn_ref_id } = await decryption(data, secret);
             if (txn_type === 1){
-                 let [[{balance}]] =  await read.query("SELECT balance FROM transaction where txn_id = ? limit 1" , [txn_ref_id]);
-                 amount = +amount + +balance;
+                 let [[data]] =  await read.query("SELECT balance FROM transaction where txn_id = ? limit 1" , [txn_ref_id]);
+                 if (data && data.balance !== undefined) {
+                    amount = +amount + +data.balance;
+                }
+                
             }
                 
             let query = '';

@@ -4,8 +4,6 @@ const { read, write } = require("../../db_config/db");
 const { getRedis } = require("../../redis/connection");
 
 
-
-
 const addGame = async (req, res) => {
     try {
         if (req.operator?.user?.user_type === 'admin') {
@@ -62,13 +60,7 @@ const operatorFindGame = async (req, res) => {
             if (data.status === 200) {
                 return res.status(200).send({ status: true, msg: "games list fetched successfully", data: data.data });
             }
-            //  else {
-            //     console.log(`received an invalid response from upstream server`);
-            //     return res.status(401).send({ status: false, msg: "Token Expired or Request timed out.!" })
-            // }
         }).catch(err => {
-        //    console.error(`[ERR] while getting games from service operator is::`, err.response.data)
-          //  return res.status(401).send(err.response.data);
             let data = err.response.data
             return res.status(401).send( {...data , code : 401} );
         })
@@ -80,4 +72,16 @@ const operatorFindGame = async (req, res) => {
     }
 }
 
-module.exports = { addGame, findGame, operatorFindGame }
+const getGeame = async(req ,res)=>{
+    try{
+    const {url}= req.body
+    const [[data]]= await read.query("select * from games_master_list where redirect_url = ?" , [url])
+    return  res.status(200).send({status : true , data})
+    }catch(er){
+        console.log(er)
+        return res.status(500).json({ msg: "Internal server Error", status: false })
+    }
+}
+
+
+module.exports = { addGame, findGame, operatorFindGame  , getGeame}
