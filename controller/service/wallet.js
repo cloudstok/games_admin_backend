@@ -81,11 +81,11 @@ const updateUserBalance = async (req, res) => {
                      await write.query(sql , [ userId, amount  , operatorId, JSON.stringify(data?.data) , txn_id , description, txn_type])
                      console.log()
                     if (data.status === 200) {
-                        console.log("roolback" )
-                        if(txn_type == 1){
-                            const sql_rollback_detail =  "INSERT INTO rollback_detail (backend_base_url, options) VALUES ( ? , ?)"
-                            await write.query(sql_rollback_detail , [req.url , options])
-                        }
+                        // console.log("roolback" )
+                        // if(txn_type == 1){
+                        //     const sql_rollback_detail =  "INSERT INTO rollback_detail (backend_base_url, options) VALUES ( ? , ?)"
+                        //     await write.query(sql_rollback_detail , [req.url , options])
+                        // }
                         return res.status(200).send(data.data);
                     } else {
                         // here store data for rollback 
