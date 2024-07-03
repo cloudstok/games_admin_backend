@@ -10,9 +10,9 @@ const dbConfig = {
 read = createPool(dbConfig);
 write = createPool(dbConfig);
 
-(async ()=>{
-   console.log("DATABASE CONNECTION SUCCESSFUL")
-})()
+// (async ()=>{
+//    console.log("DATABASE CONNECTION SUCCESSFUL")
+// })()
 
 
 module.exports = {read , write}

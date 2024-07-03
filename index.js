@@ -4,6 +4,8 @@ const { operatorRouter } = require('./routes/operator-route');
 const { serviceRouter } = require('./routes/service-route');
 const { deleteRedis } = require('./redis/connection');
 const app = express()
+
+//require('./utilities/rollbackcron')
 require('dotenv').config();
 // (async()=>await deleteRedis("users"))()
 const PORT = process.env.PORT || 4100

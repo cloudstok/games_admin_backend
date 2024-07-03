@@ -5,10 +5,11 @@ const { addGame, findGame, getGameFromServiceProvider } = require('../controller
 const { getUserBalance, updateUserBalance } = require('../controller/service/wallet');
 const { verifyToken } = require('../utilities/jwt/jsonwebtoken');
 const { activeUser, getuserDetail, getUserDetail } = require('../controller/service/user');
-const { getransaction } = require('../controller/service/transaction');
+const { getransaction, rollbacklist } = require('../controller/service/transaction');
 const serviceRouter = require('express').Router();
 const { add_webhook, get_webhook, webhook } = require('../controller/service/webhook');
 const { bets } = require('../controller/service/bets');
+const { rollback } = require('../utilities/rollbackcron');
 
 
 //Service Panel routes
@@ -39,5 +40,12 @@ serviceRouter.get('/transaction/detail', getransaction);
 serviceRouter.post('/webhook', add_webhook);
 serviceRouter.get('/webhook', get_webhook);
 serviceRouter.get('/webhook/:user_id', webhook);
+
+
+
+//rollback list
+serviceRouter.get('/rollback/list', rollbacklist);
+serviceRouter.get('/rollback', rollback);
+
 
 module.exports = { serviceRouter };
