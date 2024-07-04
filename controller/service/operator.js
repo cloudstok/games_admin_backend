@@ -98,7 +98,6 @@ const userLogin = async (req, res) => {
         return res.status(400).send({ status: false, msg: "Request timed out" });
       }
       const token = await generateUUIDv7();
-
       let user = await getRedis('users')
       if (user) {
         user = JSON.parse(user);
@@ -120,5 +119,36 @@ const userLogin = async (req, res) => {
 
 
 
-module.exports = { login, register, userLogin, getOperatorList }
+
+const changePassword = async (req, res) => {
+  try {
+   
+    let { token } = req.headers;
+    const { currentPassword, newPassword, confirmPassword } = req.body;
+    if(newPassword !== confirmPassword){
+      return res.status(200).send({ status: true, msg: `your ${newPassword} is not match your ${confirmPassword}` })
+    }
+    const {userId} = JSON.parse(await getRedis(token))
+    const [getUser] = await write.query(`SELECT * FROM user WHERE user_id = ?`, [userId]);
+    if (getUser.length > 0) {
+      const checkPassword = await compare(currentPassword, getUser[0].password)
+      if (!checkPassword) {
+        return res.status(401).json({ status: false, msg: "Missing or Incorrect Credentials" });
+      } else {
+        const hashedPassword = await hashPassword(newPassword);
+        await read.query("update user set password = ? where user_id = ?", [hashedPassword, userId])
+        return res.status(200).send({ status: true, msg: "change password successfully" })
+      }
+    } else {
+      return res.status(400).send({ status: false, msg: "User does not exists" });
+    }
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ msg: "Internal server Error", status: false })
+  }
+}
+
+
+
+module.exports = { login, register, userLogin, getOperatorList, changePassword }
 
