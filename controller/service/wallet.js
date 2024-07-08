@@ -76,17 +76,18 @@ const updateUserBalance = async (req, res) => {
 
                     }
                 };
+                let status = 0;
                 await axios(options).then(async data => {
-
                     if (data.status === 200) {
-                        await transaction([userId, token, operatorId, txn_id, amount, txn_ref_id, description, txn_type, 2]);
-
+                        status = 2;
+                        await transaction([userId, token, operatorId, txn_id, amount, txn_ref_id || null, description, txn_type, status]);
                         return res.status(200).send(data.data);
                     } else {
                         // here store data for rollback 
-                        const transaction_id = await transaction([userId, token, operatorId, txn_id, amount, txn_ref_id, description, txn_type, 1]);
-                        if (txn_type == 1) {
-                            await rollback([transaction_id, 2, JSON.stringify(options)])
+                        status = txn_type == 1 ? 1 : 0;
+                        const transaction_id = await transaction([userId, token, operatorId, txn_id, amount, txn_ref_id || null, description, txn_type, status]);
+                        if (status == 1) {
+                            await rollback([transaction_id, 2, JSON.stringify({ ...req.body, token})])
                         }
                         console.log(`received an invalid response from upstream server`);
                         return res.status(data.status).send({ status: false, msg: `Request failed from upstream server with response:: ${JSON.stringify(data)}` })
@@ -94,9 +95,10 @@ const updateUserBalance = async (req, res) => {
                 }).catch(async err => {
                     let data = err?.response?.data
                     //here insert data in to transaction
-                    const transaction_id = await transaction([userId, token, operatorId, txn_id, amount, txn_ref_id, description, txn_type, 1]);
-                    if (txn_type == 1) {
-                        await rollback([transaction_id, 2, JSON.stringify(options)])
+                    status = txn_type === 1 ? 1 : 0;
+                    const transaction_id = await transaction([userId, token, operatorId, txn_id, amount, txn_ref_id || null, description, txn_type, status]);
+                    if (status == 1) {
+                        await rollback([transaction_id, 2, JSON.stringify({ ...req.body, token})])
                     }
                     return res.status(500).send({ status: false, msg: "Internal Server error" });
                 })
@@ -124,7 +126,7 @@ const transaction = async (data) => {
 
 const rollback = async (data) => {
     try {
-        const sql_rollback_detail = "INSERT IGNORE INTO pending_transactions ( transaction_id , backend_base_url, options ) VALUES ( ? )"
+        const sql_rollback_detail = "INSERT IGNORE INTO pending_transactions ( transaction_id , game_id, options ) VALUES ( ? )"
         const [{ insertId }] = await write.query(sql_rollback_detail, [data])
         return insertId
     } catch (e) {

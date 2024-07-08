@@ -8,7 +8,7 @@ const { activeUser, getuserDetail, getUserDetail } = require('../controller/serv
 const { getransaction, rollbacklist } = require('../controller/service/transaction');
 const serviceRouter = require('express').Router();
 const { add_webhook, get_webhook, webhook } = require('../controller/service/webhook');
-const { bets } = require('../controller/service/bets');
+const { bets, manualCashoutOrRollback } = require('../controller/service/bets');
 const { rollback } = require('../utilities/rollbackcron');
 
 
@@ -46,6 +46,7 @@ serviceRouter.get('/webhook/:user_id', webhook);
 //rollback list
 serviceRouter.get('/rollback/list', rollbacklist);
 serviceRouter.get('/rollback', rollback);
+serviceRouter.post('/manual/transaction/update', manualCashoutOrRollback)
 
 
 module.exports = { serviceRouter };

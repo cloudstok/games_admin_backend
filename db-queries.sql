@@ -124,10 +124,12 @@ CREATE TABLE webhook_config (
 create table pending_transactions(
     id int primary key auto_increment,
     transaction_id int,
-    backend_base_url varchar(255),
+    game_id varchar(255),
     options json,
-    retry int default 0,
-    status enum('0', '1', '2') default '1',
+    cashout_retries int default 0,
+    rollback_retries int default 0,
+    `event` enum('cashout', 'rollback') default 'cashout',
+    txn_status enum('0', '1', '2') default '1',
     created_at timestamp default current_timestamp,
     updated_at timestamp on update current_timestamp
 );

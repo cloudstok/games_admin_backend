@@ -80,4 +80,44 @@ const getWebhookUrl = async(user_id, event_name) => {
     }
 }
 
-module.exports = { generateRandomString, generateRandomUserId, generateUUID , generateUUIDv7, getWebhookUrl}
+const getEventOptions = async(data, event) => {
+    if (event === 'cashout') {
+        cashout_retries += 1;
+        await write.query(`UPDATE pending_transactions SET cashout_retries = ?, event = ? WHERE id = ?`, [cashout_retries, 'cashout', id]);
+    } else {
+        rollback_retries += 1;
+        await write.query(`UPDATE pending_transactions SET rollback_retries = ?, event = ? WHERE id = ?`, [rollback_retries, 'rollback', id]);
+        let { token, txn_ref_id } = options;
+        let [getRollbackTransaction] = await write.query(`SELECT * FROM transaction WHERE txn_id = ?`, [txn_ref_id]);
+        if (getRollbackTransaction.length > 1) {
+            getRollbackTransaction = getRollbackTransaction[1];
+        } else {
+            getRollbackTransaction = getRollbackTransaction[0];
+            rollbackFlag = 1;
+        }
+        let rollbackAmount = getRollbackTransaction.amount;
+        let transactionId = getRollbackTransaction.txn_type === '2' ? getRollbackTransaction.txn_id : generateUUIDv7();
+        data = {
+            token, txn_id: transactionId, txn_ref_id, amount: rollbackAmount, description: `${rollbackAmount} Rollback for transaction with reference ID ${txn_ref_id}`, txn_type: 2
+        }
+    }
+}
+
+const createOptions =(url, options)=>{
+    let token = options.token;
+    delete options.token
+    let clientServerOptions = {
+        url,
+        method: 'POST',
+        headers: {
+            "Content-Type": "application/json",
+            token
+        },
+        data:{
+            data: options
+        }
+    }
+    return clientServerOptions
+}
+
+module.exports = { generateRandomString, generateRandomUserId, generateUUID , generateUUIDv7, getWebhookUrl, createOptions}
