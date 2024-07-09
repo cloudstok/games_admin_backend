@@ -1,6 +1,6 @@
 //const { addGame, findGame } = require('../controller/service/game');
 const { register, login, userLogin, getOperatorList } = require('../controller/service/operator');
-const { serviceAddGame, serviceFindGame, getOperatorGame, getMasterListGames, getOperatorGamesForService, addGameForOperator } = require('../controller/service/game');
+const { serviceAddGame, serviceFindGame, getOperatorGame, getMasterListGames, getOperatorGamesForService, addGameForOperator, getGameURL } = require('../controller/service/game');
 const { addGame, findGame, getGameFromServiceProvider } = require('../controller/operator/game');
 const { getUserBalance, updateUserBalance } = require('../controller/service/wallet');
 const { verifyToken } = require('../utilities/jwt/jsonwebtoken');
@@ -21,6 +21,10 @@ serviceRouter.post('/register/game', verifyToken, serviceAddGame)
 serviceRouter.get('/games/list', verifyToken, getMasterListGames);
 serviceRouter.get('/game/operator/:operator_id', verifyToken, getOperatorGamesForService);
 serviceRouter.post('/register/operator/game', verifyToken, addGameForOperator);
+
+// find game
+serviceRouter.get('/game/url', getGameURL);
+
 
 //Call from Operator's API
 serviceRouter.get('/operator/game', getOperatorGame);
