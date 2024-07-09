@@ -37,26 +37,26 @@ const manualCashoutOrRollback = async (req, res) => {
             let data = options;
                 let operatorUrl = await getWebhookUrl(operator_id, "UPDATE_BALANCE");
                 if (operatorUrl) {
-                    // if (event === 'cashout') {
-                    //     cashout_retries += 1;
-                    //     await write.query(`UPDATE pending_transactions SET cashout_retries = ?, event = ? WHERE id = ?`, [cashout_retries, 'cashout', id]);
-                    // } else {
-                    //     rollback_retries += 1;
-                    //     await write.query(`UPDATE pending_transactions SET rollback_retries = ?, event = ? WHERE id = ?`, [rollback_retries, 'rollback', id]);
-                    //     let { token, txn_ref_id } = options;
-                    //     let [getRollbackTransaction] = await write.query(`SELECT * FROM transaction WHERE txn_id = ?`, [txn_ref_id]);
-                    //     if (getRollbackTransaction.length > 1) {
-                    //         getRollbackTransaction = getRollbackTransaction[1];
-                    //     } else {
-                    //         getRollbackTransaction = getRollbackTransaction[0];
-                    //         rollbackFlag = 1;
-                    //     }
-                    //     let rollbackAmount = getRollbackTransaction.amount;
-                    //     let transactionId = getRollbackTransaction.txn_type === '2' ? getRollbackTransaction.txn_id : generateUUIDv7();
-                    //     data = {
-                    //         token, txn_id: transactionId, txn_ref_id, amount: rollbackAmount, description: `${rollbackAmount} Rollback for transaction with reference ID ${txn_ref_id}`, txn_type: 2
-                    //     }
-                    // }
+                    if (event === 'cashout') {
+                        cashout_retries += 1;
+                        await write.query(`UPDATE pending_transactions SET cashout_retries = ?, event = ? WHERE id = ?`, [cashout_retries, 'cashout', id]);
+                    } else {
+                        rollback_retries += 1;
+                        await write.query(`UPDATE pending_transactions SET rollback_retries = ?, event = ? WHERE id = ?`, [rollback_retries, 'rollback', id]);
+                        let { token, txn_ref_id } = options;
+                        let [getRollbackTransaction] = await write.query(`SELECT * FROM transaction WHERE txn_id = ?`, [txn_ref_id]);
+                        if (getRollbackTransaction.length > 1) {
+                            getRollbackTransaction = getRollbackTransaction[1];
+                        } else {
+                            getRollbackTransaction = getRollbackTransaction[0];
+                            rollbackFlag = 1;
+                        }
+                        let rollbackAmount = getRollbackTransaction.amount;
+                        let transactionId = getRollbackTransaction.txn_type === '2' ? getRollbackTransaction.txn_id : generateUUIDv7();
+                        data = {
+                            token, txn_id: transactionId, txn_ref_id, amount: rollbackAmount, description: `${rollbackAmount} Rollback for transaction with reference ID ${txn_ref_id}`, txn_type: 2
+                        }
+                    }
                     const requestOptions = createOptions(operatorUrl, data);
                     requestOptions.data.data = await encryption(requestOptions.data.data, secret);
                     await axios(requestOptions).then(async (data) => {
