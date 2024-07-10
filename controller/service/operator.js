@@ -91,7 +91,7 @@ const userLogin = async (req, res) => {
     let { data } = req.body;
     const [getOperator] = await write.query(`SELECT * FROM operator WHERE pub_key = ?`, [id]);
     if (getOperator.length > 0) {
-      const { user_id, pub_key, secret, url } = getOperator[0];
+      let { user_id, pub_key, secret, url } = getOperator[0];
       const decodeData = await decryption(data, secret);
       let timeDifference = (Date.now() - decodeData.reqTime) / 1000;
       if (timeDifference > 5) {
@@ -106,8 +106,9 @@ const userLogin = async (req, res) => {
       } else {
         await setRedis('users', JSON.stringify([token]), 3600 * 24)
       }
+      url = decodeData?.url ? decodeData.url : url;
       await setRedis(token, JSON.stringify({ userId: decodeData.user_id, operatorId: user_id, pub_key, secret, url }), 3600)
-      return res.status(200).send({ status: true, msg: "User authenticated", token })
+      return res.status(200).send({ status: true, msg: "User authenticated", token });
     } else {
       return res.status(400).send({ status: false, msg: "Request initiated for Invalid Operator" });
     }

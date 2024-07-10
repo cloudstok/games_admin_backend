@@ -131,12 +131,12 @@ const getuserDetail = async (req, res) => {
         } catch (err) {
             return res.status(400).send({ status: false, msg: "We've encountered an internal error" })
         }
-        const { userId } = validateUser;
+        const { userId, operatorId } = validateUser;
         // const [[getOperator]] = await write.query(`SELECT secret FROM operator WHERE user_id = ?`, [operatorId]);
         //    const data = await decryption(req.body.data , getOperator.secret)
         let sql = "SELECT  u.name,  u.user_id,  w.balance,  u.profile_url AS avatar FROM  games_admin.user as u INNER JOIN  user_wallet as w ON u.user_id = w.user_id where u.user_id = ?";
         const [[user]] = await read.query(sql, [userId])
-        return res.status(200).send({ status: true, msg: "get detail", user })
+        return res.status(200).send({ status: true, msg: "get detail", user:{...user, operatorId} })
     } catch (err) {
         console.error(err);
         return res.status(500).json({ msg: "Internal server Error", status: false })
