@@ -46,30 +46,20 @@ async function generateUUID() {
 }
 
 
-function generateUUIDv7() {
-    // Get current time in milliseconds since Unix epoch
+async function generateUUIDv7() {
     const timestamp = Date.now();
-
-    // Convert timestamp to hex string
     const timeHex = timestamp.toString(16).padStart(12, '0');
-
-    // Generate 54 random bits for the rest of the UUID
     const randomBits = crypto.randomBytes(8).toString('hex').slice(2);
-
-    // Assemble UUID components
     const uuid = [
-        timeHex.slice(0, 8),  // First 32 bits from timestamp
-        timeHex.slice(8) + randomBits.slice(0, 4),  // Next 16 bits from timestamp + 16 random bits
-        '7' + randomBits.slice(4, 7),  // Version 7 + 12 random bits
-        (parseInt(randomBits.slice(7, 8), 16) & 0x3f | 0x80).toString(16) + randomBits.slice(8, 12),  // Variant + 14 random bits
-        randomBits.slice(12)  // Remaining random bits
+        timeHex.slice(0, 8), 
+        timeHex.slice(8) + randomBits.slice(0, 4), 
+        '7' + randomBits.slice(4, 7), 
+        (parseInt(randomBits.slice(7, 8), 16) & 0x3f | 0x80).toString(16) + randomBits.slice(8, 12),
+        randomBits.slice(12)
     ];
 
     return uuid.join('-');
 }
-
-// Generate a UUID v7
-// const uuid7 = generateUUIDv7();
 
 const getWebhookUrl = async(user_id, event_name) => {
     try{
