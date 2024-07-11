@@ -7,13 +7,12 @@ const { decryption } = require('../../utilities/ecryption-decryption')
 const { setRedis, getRedis, deleteRedis } = require('../../redis/connection')
 const { json } = require('express')
 
+
+// Operator login API
 const login = async (req, res) => {
   try {
     const { userId, password } = req.body
     const [data] = await read.query("SELECT id, user_id, password, pub_key, secret, user_type  FROM operator where user_id = ?", [userId])
-
-
-    // const [wallet] = await read.query("SELECT id, user_id, password, pub_key, secret, user_type  FROM operator where user_id = ?", [userId])
 
     if (data.length > 0) {
       const checkPassword = await compare(password, data[0].password)
@@ -33,6 +32,34 @@ const login = async (req, res) => {
 
 
 
+// Operator change Password
+const OperatorchangePassword = async (req, res) => {
+  try {
+  const {id, user_id, password, pub_key, secret, user_type }= req.operator.user
+  const { currentPassword, newPassword, confirmPassword } = req.body;
+    if(newPassword !== confirmPassword){
+      return res.status(200).send({ status: true, msg: `your ${newPassword} is not match your ${confirmPassword}` })
+    }
+    const [getUser] = await write.query(`SELECT * FROM operator WHERE user_id = ?`, [user_id]);
+    if (getUser.length > 0) {
+      const checkPassword = await compare(currentPassword, getUser[0].password)
+      if (!checkPassword) {
+        return res.status(401).json({ status: false, msg: "Missing or Incorrect Credentials" });
+      } else {
+        const hashedPassword = await hashPassword(newPassword);
+        await read.query("update operator set password = ? where user_id = ?", [hashedPassword, user_id])
+        return res.status(200).send({ status: true, msg: "change password successfully" })
+      }
+    } else {
+      return res.status(400).send({ status: false, msg: "User does not exists" });
+    }
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ msg: "Internal server Error", status: false })
+  }
+}
+
+// Operator Register Successfully
 const register = async (req, res) => {
   try {
     if (req.operator?.user?.user_type === 'admin') {
@@ -85,6 +112,9 @@ const getOperatorList = async (req, res) => {
   }
 }
 
+
+
+// User login 
 const userLogin = async (req, res) => {
   try {
     let { id } = req.params;
@@ -118,7 +148,7 @@ const userLogin = async (req, res) => {
 }
 
 
-
+// Operator change Password
 
 const changePassword = async (req, res) => {
   try {
@@ -150,5 +180,5 @@ const changePassword = async (req, res) => {
 
 
 
-module.exports = { login, register, userLogin, getOperatorList, changePassword }
+module.exports = { login, register, userLogin, getOperatorList, changePassword , OperatorchangePassword }
 

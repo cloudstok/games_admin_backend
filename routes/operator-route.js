@@ -4,7 +4,7 @@ const { verifyToken } = require('../utilities/jwt/jsonwebtoken');
 const { addWallet, findWallet, userBalance, updateBalance, AllWallet } = require('../controller/operator/wallet');
 const { operatorFindGame, getGeame } = require('../controller/operator/game');
 const { logout } = require('../controller/service/user');
-const { changePassword } = require('../controller/service/operator');
+const { changePassword, OperatorchangePassword } = require('../controller/service/operator');
 const operatorRouter = require('express').Router();
 operatorRouter.post('/create/user', verifyToken, addUser);
 operatorRouter.post('/user/login', userLogin)
@@ -19,7 +19,8 @@ operatorRouter.get('/user/list', getUser);
 operatorRouter.get('/user/logout', logout);
 operatorRouter.get('/user/detail', getuserDetail);
 operatorRouter.get('/game/detail', getGeame);
-operatorRouter.post('/user/change/password', changePassword);
+operatorRouter.post('/user/change/password', changePassword); // user change Password
+operatorRouter.post('/change/password', verifyToken , OperatorchangePassword);  // operator change Password
 
 
 module.exports = { operatorRouter };

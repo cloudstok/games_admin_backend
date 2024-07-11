@@ -75,7 +75,7 @@ const getUserDetail = async (req, res) => {
                 };
                 await axios(options).then(data => {
                     if (data.status === 200) {
-                        return res.status(200).send(data.data);
+                        return res.status(200).send({...data.data , operatorId});
                     } else {
                         console.log(`received an invalid response from upstream server`);
                         return res.status(data.status).send({ status: false, msg: `Request failed from upstream server with response:: ${JSON.stringify(data)}` })

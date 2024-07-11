@@ -81,6 +81,10 @@ const updateUserBalance = async (req, res) => {
                     if (data.status === 200) {
                         status = 2;
                         await transaction([userId, token, operatorId, txn_id, amount, txn_ref_id || null, description, txn_type, status]);
+
+                        if (status == 1) {
+                            await rollback([transaction_id, 2, JSON.stringify({ ...req.body, token})])
+                        }
                         return res.status(200).send(data.data);
                     } else {
                         // here store data for rollback 

@@ -90,30 +90,20 @@ const getMasterListGames = async (req, res) => {
 const getGameURL = async (req, res) => {
     try {
         const { token } = req.headers;
-        
         if (!token) {
             return res.status(400).json({ msg: "Token is missing", status: false });
         }
-
         const redisData = await getRedis(token);
-     
-
         if (!redisData) {
             return res.status(404).json({ msg: "URL not found", status: false });
         }
-
-
         const { url } = JSON.parse(redisData);
-       
-
         return res.status(200).send({ status: true, msg: "Find Game URL", url });
     } catch (err) {
         console.log(err);
-
         if (err instanceof SyntaxError) {
             return res.status(400).json({ msg: "Invalid data format", status: false });
         }
-
         return res.status(500).json({ msg: "Internal server error", status: false });
     }
 };

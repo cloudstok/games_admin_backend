@@ -33,8 +33,8 @@ const manualCashoutOrRollback = async (req, res) => {
             }
             let [operator] = await write.query(`SELECT * FROM operator where user_id = ?`, [operator_id]);
             if (operator.length > 0) {
-            let secret = operator[0].secret;
-            let data = options;
+                let secret = operator[0].secret;
+                let data = options;
                 let operatorUrl = await getWebhookUrl(operator_id, "UPDATE_BALANCE");
                 if (operatorUrl) {
                     if (event === 'cashout') {
