@@ -5,6 +5,7 @@ const { addWallet, findWallet, userBalance, updateBalance, AllWallet } = require
 const { operatorFindGame, getGeame } = require('../controller/operator/game');
 const { logout } = require('../controller/service/user');
 const { changePassword, OperatorchangePassword } = require('../controller/service/operator');
+const { rollbackCredit } = require('../controller/operator/bets');
 const operatorRouter = require('express').Router();
 operatorRouter.post('/create/user', verifyToken, addUser);
 operatorRouter.post('/user/login', userLogin)
@@ -21,6 +22,6 @@ operatorRouter.get('/user/detail', getuserDetail);
 operatorRouter.get('/game/detail', getGeame);
 operatorRouter.post('/user/change/password', changePassword); // user change Password
 operatorRouter.post('/change/password', verifyToken , OperatorchangePassword);  // operator change Password
-
+operatorRouter.post('/transaction/rollback', rollbackCredit);
 
 module.exports = { operatorRouter };

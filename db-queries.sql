@@ -37,7 +37,7 @@ CREATE TABLE `operator` (
 CREATE TABLE `games_master_list` (
     game_id int not null AUTO_INCREMENT,
     name varchar(60) unique not null,
-    redirect_url varchar(255) unique ,
+    url varchar(255) unique ,
     backend_base_url varchar(255) unique ,
     image varchar(255) default null,
     is_active boolean default true,
@@ -88,11 +88,12 @@ values
 
 -- ALTER TABLE `user_wallet` CHANGE COLUMN `user_id` `user_id` VARCHAR(60) NOT NULL ;
 insert into
-    games_master_list (name, redirect_url, image)
+    games_master_list (name, url, backend_base_url, image)
 values
 (
-        'avaitor',
+        'AVIATOR',
         'https://aviator.ayodhya365.co/',
+        'https://ayodhya365.co/',
         'https://jaunpur123.s3.ap-south-1.amazonaws.com/1717673785290_aviator-pic.jpg'
     );
 
