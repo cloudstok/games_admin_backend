@@ -97,6 +97,17 @@ values
         'https://jaunpur123.s3.ap-south-1.amazonaws.com/1717673785290_aviator-pic.jpg'
     );
 
+
+
+    insert into
+    games_master_list (name, redirect_url, image)
+values
+(
+        'crash royale',
+        'https://crashroyal.wings365.in/',
+        'https://jaunpur123.s3.ap-south-1.amazonaws.com/1720070619474_crashbg.png'
+    );
+
 CREATE TABLE transaction (
     id int primary key auto_increment,
     user_id varchar(255),
