@@ -100,11 +100,12 @@ values
 
 
     insert into
-    games_master_list (name, redirect_url, image)
+    games_master_list (name, url, backend_base_url, image)
 values
 (
         'crash royale',
         'https://crashroyal.wings365.in/',
+        'https://wings365.in',
         'https://jaunpur123.s3.ap-south-1.amazonaws.com/1720070619474_crashbg.png'
     );
 
