@@ -2,43 +2,92 @@
 const { read, write } = require("../../db_config/db");
 const { getRedis } = require("../../redis/connection");
 const { decryption } = require("../../utilities/ecryption-decryption");
+
 const addWallet = async (req, res) => {
-    try {
-        const { user_id } = req.body
-        await write.query("insert IGNORE into user_wallet (user_id ,balance) value(? , ?)", [user_id, '3000.00'])
-        await write.query("update user set is_wallet = ? where  user_id  = ?", [true, user_id])
-        return res.status(200).send({ status: true, msg: "Wallet Add successfully to master's list" })
-    } catch (err) {
-        console.log(err)
-        return res.status(500).json({ msg: "Internal server Error", status: false })
+    const { user_id } = req.body;
+    console.log({ user_id })
+    if (!user_id) {
+        return res.status(400).json({ status: false, msg: "User ID is required" });
     }
-}
+    const connection = await write.getConnection();
+    try {
+        await connection.beginTransaction();
+        const insertWalletQuery = "INSERT IGNORE INTO user_wallet (user_id, balance) VALUES (?, ?)";
+        const updateWalletQuery = "UPDATE user SET is_wallet = ? WHERE user_id = ?";
+        // Execute both queries concurrently using Promise.all
+        await Promise.all([
+            connection.query(insertWalletQuery, [user_id, '3000.00']),
+            connection.query(updateWalletQuery, [true, user_id])
+        ]);
+        await connection.commit();
+        return res.status(200).json({ status: true, msg: "Wallet added successfully to master's list" });
+    } catch (err) {
+        await connection.rollback();
+        console.error(err);
+        return res.status(500).json({ status: false, msg: "Internal server error" });
+    } finally {
+        connection.release();
+    }
+};
+
+
+
+
 const findWallet = async (req, res) => {
     try {
-        const { user_id } = req.params
-        //  const {} =  await decryption(data , pub_key)
-        const [data] = await write.query("select * from user_wallet user_id = ? ", [user_id])
-        return res.status(200).send({ status: true, data })
-    } catch (er) {
-        console.log(er)
-        return res.status(500).json({ msg: "Internal server Error", status: false })
+        const { user_id } = req.params;
+        // Validate user_id (if necessary)
+        if (!user_id) {
+            return res.status(400).json({ status: false, msg: "User ID is required" });
+        }
+        // Perform database query
+        const [data] = await write.query("SELECT * FROM user_wallet WHERE user_id = ?", [user_id]);
+        // Check if data is found
+        if (!data || data.length === 0) {
+            return res.status(404).json({ status: false, msg: "Wallet not found" });
+        }
+        // Return data
+        return res.status(200).json({ status: true, data });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ status: false, msg: "Internal server error" });
     }
-}
+};
+
+
+// const AllWallet = async (req, res) => {
+//     try {
+//         let { limit, offset } = req.query
+//         if (!(limit && offset)) {
+//             limit = 100
+//             offset = 0
+//         }
+//         const [data] = await write.query("SELECT * FROM user inner join user_wallet on user.user_id = user_wallet.user_id limit  ?  offset ?", [+limit, +offset])
+//         return res.status(200).send({ status: true, data })
+//     } catch (er) {
+//         console.log(er)
+//         return res.status(500).json({ msg: "Internal server Error", status: false })
+//     }
+// }
+
 
 const AllWallet = async (req, res) => {
     try {
-        let { limit, offset } = req.query
-        if (!(limit && offset)) {
-            limit = 100
-            offset = 0
+        let { limit = 100, offset = 0 } = req.query;
+        limit = parseInt(limit);
+        offset = parseInt(offset);        if (isNaN(limit) || isNaN(offset)) {
+            return res.status(400).send({ status: false, msg: "Invalid limit or offset" });
         }
-        const [data] = await write.query("SELECT * FROM user inner join user_wallet on user.user_id = user_wallet.user_id limit  ?  offset ?", [+limit, +offset])
-        return res.status(200).send({ status: true, data })
-    } catch (er) {
-        console.log(er)
-        return res.status(500).json({ msg: "Internal server Error", status: false })
+        // Perform database query
+        const [data] = await write.query("SELECT * FROM user INNER JOIN user_wallet ON user.user_id = user_wallet.user_id LIMIT ? OFFSET ?", [limit, offset]);
+        // Return data
+        return res.status(200).json({ status: true, data });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ status: false, msg: "Internal server error" });
     }
-}
+};
+
 
 const userBalance = async (req, res) => {
     try {
