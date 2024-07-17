@@ -95,7 +95,6 @@ const getEventOptions = async(data, event) => {
 
 const createOptions =(url, options)=>{
     let token = options.token;
-    delete options.token
     let clientServerOptions = {
         url,
         method: 'POST',
