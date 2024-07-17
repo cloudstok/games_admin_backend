@@ -4,17 +4,23 @@ const { getWebhookUrl, createOptions, generateUUIDv7 } = require('../../utilitie
 const { encryption, decryption } = require('../../utilities/ecryption-decryption');
 const { getRedis } = require('../../redis/connection');
 
-
+// Get Bets from Game
 const bets = async (req, res) => {
     try {
         const { limit, offset } = req.query
-        let { data } = await axios.get(`${process.env.bets_base_url}?limit=${limit}&offset=${offset}`);
-        return res.status(200).send({ statu: true, msg: "Find Data", data: data.data })
+        const data = await fetchBetsData(limit, offset);
+        return res.status(200).send({ status: true, msg: "Games Fetched successfully", data })
     } catch (er) {
         console.error(er);
         return res.status(500).send({ status: false, msg: "internal server Error", er })
     }
 }
+const fetchBetsData = async (limit, offset) => {
+    const url = `${process.env.bets_base_url}?limit=${limit}&offset=${offset}`;
+    const response = await axios.get(url);
+    return response?.data?.data;
+};
+
 
 //Admin Rollback or Cashout Retry
 const manualCashoutOrRollback = async (req, res) => {
@@ -248,5 +254,6 @@ const finalizeRollback = async (userId, token, operatorId, transactionId, rollba
         throw new Error('Rollback finalization failed');
     }
 };
+
 
 module.exports = { bets, operatorRollback, manualCashoutOrRollback }
