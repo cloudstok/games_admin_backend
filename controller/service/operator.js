@@ -123,10 +123,10 @@ const userLogin = async (req, res) => {
     if (getOperator.length > 0) {
       let { user_id, pub_key, secret, url } = getOperator[0];
       const decodeData = await decryption(data, secret);
-      let timeDifference = (Date.now() - decodeData.reqTime) / 1000;
-      if (timeDifference > 5) {
-        return res.status(400).send({ status: false, msg: "Request timed out" });
-      }
+      // let timeDifference = (Date.now() - decodeData.reqTime) / 1000;
+      // if (timeDifference > 5) {
+      //   return res.status(400).send({ status: false, msg: "Request timed out" });
+      // }
       const token = await generateUUIDv7();
       let user = await getRedis('users')
       if (user) {
