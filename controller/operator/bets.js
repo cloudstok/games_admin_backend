@@ -3,58 +3,70 @@ const { encryption, decryption } = require('../../utilities/ecryption-decryption
 const axios = require('axios');
 
 
-
-
-const rollbackCredit = async(req, res)=> {
+const rollbackCredit = async (req, res) => {
     try {
-        // const { pub_key, secret } = req.operator.user;
-        const [getOperator] = await write.query(`SELECT * FROM operator WHERE user_type = 'operator' and is_deleted = 0 LIMIT 1`);
-        const { secret } = getOperator[0];
-        const { txnRefId } = req.body;
-        const {token} = req.headers;
-
-        //const [[wallet]] = await write.query(`SELECT * FROM user_wallet WHERE user_id = ?`, [userId]);
-        if (getOperator.length > 0) {
-            let encryptedData = await encryption({ txnRefId }, secret);
-            const { service_provider_url } = process.env;
-
-            //logging into service provider
-            const options = {
-                method: 'POST',
-                url: `${service_provider_url}/service/operator/rollback`,
-                headers: {
-                    'Content-Type': 'application/json',
-                    token
-                },
-                data: {
-                    data: encryptedData
-                }
-            };
-            // console.log(options , "options")
-            await axios(options).then(async data => {
-                if (data.status === 200) {
-                    const response = data.data;
-                    const decodeData = await decryption(response?.data, secret);
-                    delete response.data;
-                    return res.status(200).send({ ...response, data:{...decodeData} });
-                }
-                else {
-                    console.log(`received an invalid response from upstream server`);
-                    return res.status(data.status).send({ status: false, msg: `Request failed from upstream server with response:: ${JSON.stringify(data)}` })
-                }
-            }).catch(err => {
-                let data = err?.response
-                return res.status(data.status).send({ ...data?.data });
-            })
-
-        } else {
+        const operator = await getOperatorDetails();
+        if (!operator) {
             return res.status(400).send({ status: false, msg: "Request initiated for Invalid Operator.!" });
         }
-
-    } catch (err) {
-        console.error(err);
-        return res.send(500).send({ status: false, msg: "Internal Server Error" });
+        const { secret } = operator;
+        const { txnRefId } = req.body;
+        const { token } = req.headers;
+        const encryptedData = await encryptTransactionData(txnRefId, secret);
+        try {
+            const response = await makeRollbackRequest(encryptedData, token);
+            if (response.status === 200) {
+                await handleSuccessResponse(response, secret, res);
+            } else {
+                console.log('Received an invalid response from upstream server');
+                return res.status(response.status).send({ status: false, msg: `Request failed from upstream server with response: ${JSON.stringify(response.data)}` });
+            }
+        } catch (error) {
+            handleErrorResponse(error, res);
+        }
+    } catch (error) {
+        console.error(error);
+        return res.status(500).send({ status: false, msg: "Internal Server Error" });
     }
-}
+};
+
+const getOperatorDetails = async () => {
+    const [operator] = await write.query(`SELECT * FROM operator WHERE user_type = 'operator' AND is_deleted = 0 LIMIT 1`);
+    return operator.length > 0 ? operator[0] : null;
+};
+
+const encryptTransactionData = async (txnRefId, secret) => {
+    return await encryption({ txnRefId }, secret);
+};
+
+const makeRollbackRequest = async (encryptedData, token) => {
+    const { service_provider_url } = process.env;
+
+    const options = {
+        method: 'POST',
+        url: `${service_provider_url}/service/operator/rollback`,
+        headers: {
+            'Content-Type': 'application/json',
+            token
+        },
+        data: {
+            data: encryptedData
+        }
+    };
+
+    return await axios(options);
+};
+
+const handleSuccessResponse = async (response, secret, res) => {
+    const responseData = response.data;
+    const decodedData = await decryption(responseData?.data, secret);
+    delete responseData.data;
+    return res.status(200).send({ ...responseData, data: { ...decodedData } });
+};
+
+const handleErrorResponse = (error, res) => {
+    const data = error?.response;
+    return res.status(data?.status || 500).send({ ...data?.data });
+};
 
 module.exports = { rollbackCredit};
