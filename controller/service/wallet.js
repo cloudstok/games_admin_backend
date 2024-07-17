@@ -4,50 +4,6 @@ const { encryption } = require('../../utilities/ecryption-decryption');
 const { write } = require('../../db_config/db');
 const { getWebhookUrl } = require('../../utilities/common_function');
 
-// const getUserBalance = async (req, res) => {
-//     try {
-//         const token = req.headers.token;
-//         let validateUser = await getRedis(token);
-//         try {
-//             validateUser = JSON.parse(validateUser);
-//         } catch (err) {
-//             return res.status(400).send({ status: false, msg: "We've encountered an internal error" })
-//         }
-//         if (validateUser) {
-//             const { operatorId } = validateUser;
-//             let operatorUrl = await getWebhookUrl(operatorId, "GET_BALANCE")
-//             if (operatorUrl) {
-//                 const options = {
-//                     method: 'GET',
-//                     url: operatorUrl,
-//                     headers: {
-//                         'Content-Type': 'application/json',
-//                         token
-//                     }
-//                 };
-
-//                 await axios(options).then(data => {
-//                     if (data.status === 200) {
-//                         return res.status(200).send(data.data);
-//                     } else {
-//                         console.log(`received an invalid response from upstream server`);
-//                         return res.status(data.status).send({ status: false, msg: `Request failed from upstream server with response:: ${JSON.stringify(data)}` })
-//                     }
-//                 }).catch(err => {
-//                     return res.status(400).send(err?.response?.data);
-//                 })
-//             } else {
-//                 return res.status(400).send({ status: false, msg: "No URL configured for the event" });
-//             }
-//         } else {
-//             return res.status(400).send({ status: false, msg: "Invalid Token or session timed out" });
-//         }
-//     } catch (err) {
-//         console.error(`[Err] while trying to get user balance is:::`, err)
-//         res.status(500).send({ status: false, msg: "Internal Server error" });
-//     }
-// }
-
 const getUserBalance = async (req, res) => {
     try {
         const token = req.headers.token;
@@ -66,7 +22,6 @@ const getUserBalance = async (req, res) => {
         if (!operatorUrl) {
             return res.status(400).send({ status: false, msg: "No URL configured for the event" });
         }
-        console.log({operatorId})
         const options = {
             method: 'GET',
             url: operatorUrl,
@@ -88,7 +43,7 @@ const getUserBalance = async (req, res) => {
             return res.status(500).send({ status: false, msg: "Internal Server error" });
         }
     } catch (err) {
-       // console.error("Error getting user balance:", err.data);
+        // console.error("Error getting user balance:", err.data);
         return res.status(500).send({ status: false, msg: "Internal Server error" });
     }
 }
@@ -134,12 +89,12 @@ const updateUserBalance = async (req, res) => {
             } else {
                 status = txn_type === 1 ? 1 : 0;
                 const transaction_id = await transaction([userId, token, operatorId, txn_id, amount, txn_ref_id || null, description, txn_type, status]);
-            if (status === 1) {
-                await rollback([transaction_id, 2, JSON.stringify({ ...req.body, token })]);
-            }
+                if (status === 1) {
+                    await rollback([transaction_id, 2, JSON.stringify({ ...req.body, token })]);
+                }
                 console.log(`Received an invalid response from upstream server`);
             }
-            
+
             return res.status(response.status).send(response.data);
         }).catch(async (err) => {
             console.error("Error during HTTP request:", err);

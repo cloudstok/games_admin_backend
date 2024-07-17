@@ -5,7 +5,6 @@ const { generateToken } = require('../../utilities/jwt/jsonwebtoken')
 const { generateRandomString, generateRandomUserId, generateUUID, generateUUIDv7 } = require('../../utilities/common_function')
 const { decryption } = require('../../utilities/ecryption-decryption')
 const { setRedis, getRedis, deleteRedis } = require('../../redis/connection')
-const { json } = require('express')
 
 
 // Operator login API
@@ -35,9 +34,9 @@ const login = async (req, res) => {
 // Operator change Password
 const OperatorchangePassword = async (req, res) => {
   try {
-  const {id, user_id, password, pub_key, secret, user_type }= req.operator.user
-  const { currentPassword, newPassword, confirmPassword } = req.body;
-    if(newPassword !== confirmPassword){
+    const { id, user_id, password, pub_key, secret, user_type } = req.operator.user
+    const { currentPassword, newPassword, confirmPassword } = req.body;
+    if (newPassword !== confirmPassword) {
       return res.status(200).send({ status: true, msg: `your ${newPassword} is not match your ${confirmPassword}` })
     }
     const [getUser] = await write.query(`SELECT * FROM operator WHERE user_id = ?`, [user_id]);
@@ -98,7 +97,7 @@ const getOperatorList = async (req, res) => {
     limit = parseInt(limit);
     offset = parseInt(offset);
     if (isNaN(limit) || isNaN(offset)) {
-        return res.status(400).send({ status: false, msg: "Invalid limit or offset" });
+      return res.status(400).send({ status: false, msg: "Invalid limit or offset" });
     }
 
     if (req.operator?.user?.user_type === 'admin') {
@@ -154,13 +153,13 @@ const userLogin = async (req, res) => {
 
 const changePassword = async (req, res) => {
   try {
-   
+
     let { token } = req.headers;
     const { currentPassword, newPassword, confirmPassword } = req.body;
-    if(newPassword !== confirmPassword){
+    if (newPassword !== confirmPassword) {
       return res.status(200).send({ status: true, msg: `your ${newPassword} is not match your ${confirmPassword}` })
     }
-    const {userId} = JSON.parse(await getRedis(token))
+    const { userId } = JSON.parse(await getRedis(token))
     const [getUser] = await write.query(`SELECT * FROM user WHERE user_id = ?`, [userId]);
     if (getUser.length > 0) {
       const checkPassword = await compare(currentPassword, getUser[0].password)
@@ -182,5 +181,5 @@ const changePassword = async (req, res) => {
 
 
 
-module.exports = { login, register, userLogin, getOperatorList, changePassword , OperatorchangePassword }
+module.exports = { login, register, userLogin, getOperatorList, changePassword, OperatorchangePassword }
 

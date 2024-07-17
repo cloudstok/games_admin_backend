@@ -1,11 +1,19 @@
 const client = require("amqplib");
+const axios = require('axios');
 
 let connection = null;
 let pubChannel = null;
 let subChannel = null;
 let exchange = `games/admin`;
-let queue = `game/admin`;
+let queue = `games/admin`;
 let connected = false;
+const MAX_RETRIES = 10;
+const RETRY_DELAY_MS = 1000;
+const QUEUES = {
+    cashout: 'cashout_queue',
+    rollback: 'rollback_queue',
+    failed: 'failed_queue'
+};
 
 
 async function connect() {
@@ -34,63 +42,92 @@ async function connect() {
     }
 }
 
-async function sendToQueue(message, delay = 0) {
+async function sendToQueue(exchange, queueName, message, delay = 0) {
     try {
         if (!pubChannel) {
             await connect();
         }
-        return pubChannel.publish(exchange, queue, Buffer.from(message), {
+        pubChannel.publish(exchange, queueName, Buffer.from(message), {
             headers: { "x-delay": delay }
         });
+        console.log(`Message sent to ${queueName} queue on exchange ${exchange}`);
     } catch (error) {
-        console.error(error);
+        console.error(`Failed to send message to ${queueName} queue on exchange ${exchange}: ${error.message}`);
         throw error;
     }
 }
 
-async function consume(handler) {
+async function consumeQueue(queue, handler) {
     try {
         if (!subChannel) await connect();
         await subChannel.assertQueue(queue, { durable: true });
-        console.debug(`creating consumer ${queue}`);
-        return await subChannel.consume(queue, async (msg) => {
+        console.debug(`Creating consumer for ${queue}`);
+
+        await subChannel.consume(queue, async (msg) => {
+            if (!msg) return console.error("Invalid incoming message");
+
             try {
-                if (!msg) {
-                    return console.error("Invalid incoming message");
-                }
-                await handler(msg.content.toString());
+                await handler(queue, msg.content.toString());
                 subChannel.ack(msg);
             } catch (error) {
-                console.error(error);
+                console.error(`Handler error for ${queue}: ${error.message}`);
                 subChannel.nack(msg);
             }
         }, { noAck: false });
     } catch (error) {
-        console.error(error);
+        console.error(`Queue processing error: ${error.message}`);
         throw error;
     }
 }
 
+// async function handleMessage(queue, message) {
+//     try {
+//         const response = await sendRequest(message);
+//         console.log(`Request succeeded for ${queue}:`, response);
+//     } catch (error) {
+//         console.error(`Request failed for ${queue}: ${error.message}`);
 
-// async function handleMessage(message) {
-//     console.log("Received message:", message);
-//     // Process the message here
-//   }
+//         if (queue === QUEUES.cashout) {
+//             await handleRetryOrMoveToNextQueue(queue, message, QUEUES.rollback);
+//         } else if (queue === QUEUES.rollback) {
+//             await handleRetryOrMoveToNextQueue(queue, message, QUEUES.failed);
+//         } else {
+//             console.error(`Message permanently failed in ${queue}: ${message}`);
+//         }
+//     }
+// }
 
-// sendToQueue("Games admin testing").then(() => {
-//     console.log("Message sent to RabbitMQ");
-// }).catch((error) => {
-//     console.error("Error sending message:", error);
-// });
+// async function handleRetryOrMoveToNextQueue(currentQueue, message, nextQueue) {
+//     const retries = getRetriesFromMessage(message) + 1;
 
-// consume(handleMessage).then((consumerTag) => {
-//     console.log(`Consuming messages from queue '${queue}'. Consumer tag: ${JSON.stringify(consumerTag)}`);
-// }).catch((error) => {
-//     console.error("Error consuming messages:", error);
-// });
+//     if (retries < MAX_RETRIES) {
+//         console.log(`Retrying message in ${currentQueue} (retry #${retries})`);
+//         setTimeout(async () => {
+//             await sendToQueue('', currentQueue, appendRetriesToMessage(message, retries), RETRY_DELAY_MS);
+//         }, RETRY_DELAY_MS);
+//     } else {
+//         console.log(`Moving message from ${currentQueue} to ${nextQueue}`);
+//         await sendToQueue('', nextQueue, message);
+//     }
+// }
+
+// async function sendRequest(message) {
+//     const response = await axios.post('your_api_endpoint', message);
+//     return response.data;
+// }
+
+// function getRetriesFromMessage(message) {
+//     // Assuming message is a JSON string with a "retries" field
+//     const parsedMessage = JSON.parse(message);
+//     return parsedMessage.retries || 0;
+// }
+
+// function appendRetriesToMessage(message, retries) {
+//     const parsedMessage = JSON.parse(message);
+//     parsedMessage.retries = retries;
+//     return JSON.stringify(parsedMessage);
+// }
 
 
-module.exports = {
-    sendToQueue,
-    consume
-};
+
+module.exports = { sendToQueue, consumeQueue };

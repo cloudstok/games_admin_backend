@@ -121,5 +121,5 @@ const getGameURL = async (req, res) => {
 
 
 
-module.exports = { serviceAddGame, getOperatorGame, getMasterListGames, getOperatorGamesForService, addGameForOperator  , getGameURL };
+module.exports = { serviceAddGame, getOperatorGame, getMasterListGames, getOperatorGamesForService, addGameForOperator, getGameURL };
 
