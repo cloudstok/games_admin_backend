@@ -5,101 +5,140 @@ const { hashPassword, compare } = require("../../utilities/bcrypt/bcrypt");
 const { encryption, decryption } = require('../../utilities/ecryption-decryption');
 const jwt = require('jsonwebtoken');
 const { getRedis } = require("../../redis/connection");
+
 const addUser = async (req, res) => {
     try {
         const { id } = req.operator.user;
         const { name, currency_preference, profile_url } = req.body;
-        const userId = await generateRandomUserId(name);
-        const password = await generateRandomString(10);
+
+        const [userId, password] = await Promise.all([
+            generateRandomUserId(name),
+            generateRandomString(10)
+        ]);
+
         const hashedPassword = await hashPassword(password);
-        const sql = "insert IGNORE into user (operator_id, name, user_id , password , currency_prefrence) values(?, ?, ? , ?, ?)"
+
+        const sql = "INSERT IGNORE INTO user (operator_id, name, user_id, password, currency_prefrence) VALUES (?, ?, ?, ?, ?)";
         await write.query(sql, [id, name, userId, hashedPassword, currency_preference]);
-        return res.status(200).send({ status: true, msg: "User created successfully", data: { name, userId, password, profile_url, currency_preference } })
+
+        return res.status(200).send({ 
+            status: true, 
+            msg: "User created successfully", 
+            data: { name, userId, password, profile_url, currency_preference } 
+        });
     } catch (err) {
         console.error(err);
-        return res.status(500).json({ msg: "Internal server Error", status: false })
+        return res.status(500).json({ msg: "Internal server error", status: false });
     }
 }
 
 
+
+const getOperatorCredentials = async () => {
+    const [operator] = await write.query(`
+        SELECT pub_key, secret 
+        FROM operator 
+        WHERE user_type = 'operator' 
+          AND is_deleted = 0 
+        LIMIT 1
+    `);
+    return operator[0];
+};
+
+const getUserDetails = async (userId) => {
+    const [user] = await write.query(`
+        SELECT * 
+        FROM user 
+        WHERE user_id = ?
+    `, [userId]);
+    return user[0];
+};
+
+const validatePassword = async (inputPassword, storedPassword) => {
+    return await compare(inputPassword, storedPassword);
+};
+
+const encryptUserData = async (userData, secret) => {
+    return await encryption(userData, secret);
+};
+
+const loginToServiceProvider = async (pubKey, encryptedData) => {
+    const options = {
+        method: 'POST',
+        url: `${process.env.service_provider_url}/service/user/login/${encodeURIComponent(pubKey)}`,
+        headers: { 'Content-Type': 'application/json' },
+        data: { data: encryptedData }
+    };
+    return await axios(options);
+};
 
 const userLogin = async (req, res) => {
     try {
-        // const { pub_key, secret } = req.operator.user;
-        const [getOperator] = await write.query(`SELECT * FROM operator WHERE user_type = 'operator' and is_deleted = 0 LIMIT 1`);
-        const { pub_key, secret } = getOperator[0];
         const { userId, password } = req.body;
-        const [getUser] = await write.query(`SELECT * FROM user WHERE user_id = ?`, [userId]);
 
-        //const [[wallet]] = await write.query(`SELECT * FROM user_wallet WHERE user_id = ?`, [userId]);
-        if (getUser.length > 0) {
-            const checkPassword = await compare(password, getUser[0].password)
-            if (!checkPassword) {
-                return res.status(401).json({ status: false, msg: "Missing or Incorrect Credentials" });
-            }
-            const { user_id, name, profile_url, currency_prefrence } = getUser[0];
+        const { pub_key, secret } = await getOperatorCredentials();
+        const user = await getUserDetails(userId);
 
-            //  const {balance} = wallet
-            const reqTime = Date.now();
-            let encryptedData = await encryption({ user_id, name, profile_url, currency_prefrence, reqTime }, secret);
-            const { service_provider_url } = process.env;
-
-            //logging into service provider
-            const options = {
-                method: 'POST',
-                url: `${service_provider_url}/service/user/login/${encodeURIComponent(pub_key)}`,
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                data: {
-                    data: encryptedData
-                }
-            };
-            // console.log(options , "options")
-            await axios(options).then(data => {
-                if (data.status === 200) {
-                    return res.status(200).send({ ...data.data });
-                }
-                else {
-                    console.log(`received an invalid response from upstream server`);
-                    return res.status(data.status).send({ status: false, msg: `Request failed from upstream server with response:: ${JSON.stringify(data)}` })
-                }
-            }).catch(err => {
-                let data = err?.response?.data
-                return res.status(401).send({ ...data, code: 401 });
-                //   return res.status(401).send(err.response.data);
-                //  console.error(`[ERR] while getting game data from service provider is::`, JSON.stringify(err))
-                //  return res.status(500).send({ status: false, msg: "We've encountered an internal error" });
-            })
-
-        } else {
-            return res.status(400).send({ status: false, msg: "User does not exists" });
+        if (!user) {
+            return res.status(400).send({ status: false, msg: "User does not exist" });
         }
 
+        const isPasswordValid = await validatePassword(password, user.password);
+        if (!isPasswordValid) {
+            return res.status(401).json({ status: false, msg: "Missing or Incorrect Credentials" });
+        }
+
+        const { user_id, name, profile_url, currency_preference } = user;
+        const reqTime = Date.now();
+        const encryptedData = await encryptUserData({ user_id, name, profile_url, currency_preference, reqTime }, secret);
+
+        const response = await loginToServiceProvider(pub_key, encryptedData);
+
+        if (response.status === 200) {
+            return res.status(200).send({ ...response.data });
+        } else {
+            console.error(`Received an invalid response from upstream server`);
+            return res.status(response.status).send({ status: false, msg: `Request failed from upstream server with response: ${JSON.stringify(response.data)}` });
+        }
     } catch (err) {
+        if (err.response) {
+            const { data, status } = err.response;
+            return res.status(status).send({ ...data, code: status });
+        }
         console.error(err);
-        return res.send(500).send({ status: false, msg: "Internal Server Error" });
+        return res.status(500).send({ status: false, msg: "Internal Server Error" });
     }
 }
 
+
 const getUser = async (req, res) => {
     try {
-        let  { limit, offset } = req.query
-        if (!(limit && offset)) {
-            limit = 100
-            offset = 0
+        let { limit = 100, offset = 0 } = req.query;
+        limit = parseInt(limit);
+        offset = parseInt(offset);
+        if (isNaN(limit) || isNaN(offset)) {
+            return res.status(400).send({ status: false, msg: "Invalid limit or offset" });
         }
         const tokenHeader = req.headers.authorization;
+        if (!tokenHeader) {
+            return res.status(401).send({ status: false, msg: "Authorization header missing" });
+        }
         const token = tokenHeader.split(" ")[1];
-        const verifiedToken = jwt.verify(token, process.env.jwtSecretKey);
-
-        verifiedToken.user.id
-        const sql = `SELECT * FROM user where  operator_id = ? and is_deleted = 0 limit ? offset ?`
-        const [data] = await read.query(sql, [verifiedToken.user.id, +limit, +offset])
-        return res.status(200).send({ status: true, msg: "Find data", data })
-    } catch (er) {
-        console.error(er);
-        res.status(500).send({ er })
+        if (!token) {
+            return res.status(401).send({ status: false, msg: "Token missing" });
+        }
+        let verifiedToken;
+        try {
+            verifiedToken = jwt.verify(token, process.env.jwtSecretKey);
+        } catch (err) {
+            return res.status(401).send({ status: false, msg: "Invalid or expired token" });
+        }
+        const sql = `SELECT * FROM user WHERE operator_id = ? AND is_deleted = 0 LIMIT ? OFFSET ?`;
+        const [data] = await read.query(sql, [verifiedToken.user.id, limit, offset]);
+        return res.status(200).send({ status: true, msg: "Data retrieved successfully", data });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).send({ status: false, msg: "Internal Server Error" });
     }
 }
 
@@ -125,22 +164,38 @@ const updateUser = async (req, res) => {
 const getuserDetail = async (req, res) => {
     try {
         const token = req.headers.token;
-        let validateUser = await getRedis(token);
-        try {
-            validateUser = JSON.parse(validateUser);
-        } catch (err) {
-            return res.status(400).send({ status: false, msg: "We've encountered an internal error" })
+console.log({token})
+        if (!token) {
+            return res.status(400).send({ status: false, msg: "Token is missing" });
         }
+
+        let validateUser;
+        try {
+            validateUser = JSON.parse(await getRedis(token));
+        } catch (err) {
+            return res.status(400).send({ status: false, msg: "Invalid token data" });
+        }
+
         const { userId, operatorId } = validateUser;
-        // const [[getOperator]] = await write.query(`SELECT secret FROM operator WHERE user_id = ?`, [operatorId]);
-        //    const data = await decryption(req.body.data , getOperator.secret)
-        let sql = "SELECT  u.name,  u.user_id,  w.balance,  u.profile_url AS avatar FROM  games_admin.user as u INNER JOIN  user_wallet as w ON u.user_id = w.user_id where u.user_id = ?";
-        const [[user]] = await read.query(sql, [userId])
-        return res.status(200).send({ status: true, msg: "get detail", user:{...user, operatorId} })
+
+        const sql = `
+            SELECT u.name, u.user_id, w.balance, u.profile_url AS avatar 
+            FROM games_admin.user AS u 
+            INNER JOIN user_wallet AS w ON u.user_id = w.user_id 
+            WHERE u.user_id = ?
+        `;
+        const [[user]] = await read.query(sql, [userId]);
+
+        if (!user) {
+            return res.status(404).send({ status: false, msg: "User not found" });
+        }
+
+        return res.status(200).send({ status: true, msg: "User details retrieved successfully", user: { ...user, operatorId } });
     } catch (err) {
         console.error(err);
-        return res.status(500).json({ msg: "Internal server Error", status: false })
+        return res.status(500).json({ msg: "Internal Server Error", status: false });
     }
 }
+
 
 module.exports = { addUser, userLogin, getUser, getuserDetail }

@@ -29,12 +29,14 @@ const webhook = async (req, res) => {
 
 const get_webhook = async (req, res) => {
     try {
-        let { limit, offset } = req.query
-        if (!(limit && offset)) {
-            limit = 100
-            offset = 0
-        }
+        
+        let { limit = 100, offset = 0 } = req.query;
+        limit = parseInt(limit);
+        offset = parseInt(offset);
 
+        if (isNaN(limit) || isNaN(offset)) {
+            return res.status(400).send({ status: false, msg: "Invalid limit or offset" });
+        }
         const sql = "SELECT * FROM webhook_config limit ? offset ?"
         const [getWebhookDetails] = await write.query(sql, [+limit, +offset]);
         return res.status(200).send({ status: true, msg: "Webhook list fetched successfully", getWebhookDetails })
