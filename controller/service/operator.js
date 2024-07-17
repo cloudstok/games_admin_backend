@@ -94,10 +94,11 @@ const register = async (req, res) => {
 
 const getOperatorList = async (req, res) => {
   try {
-    let { limit, offset } = req.query
-    if (!(limit && offset)) {
-      limit = 100
-      offset = 0
+    let { limit = 100, offset = 0 } = req.query;
+    limit = parseInt(limit);
+    offset = parseInt(offset);
+    if (isNaN(limit) || isNaN(offset)) {
+        return res.status(400).send({ status: false, msg: "Invalid limit or offset" });
     }
 
     if (req.operator?.user?.user_type === 'admin') {

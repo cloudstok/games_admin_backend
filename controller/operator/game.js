@@ -6,71 +6,75 @@ const { getRedis } = require("../../redis/connection");
 
 const addGame = async (req, res) => {
     try {
-        if (req.operator?.user?.user_type === 'admin') {
-            const { name, url } = req.body
-            await write.query("insert IGNORE into games_master_list (name , url ) value(? , ?)", [name, url])
-            return res.status(200).send({ status: true, msg: "games Add successfully to master's list" })
-
-        } else {
+        const { user_type } = req.operator?.user || {};
+        if (user_type !== 'admin') {
             return res.status(401).send({ status: false, msg: "User not authorized to perform the operation" });
         }
+        const { name, url } = req.body;
+        if (!name || !url) {
+            return res.status(400).send({ status: false, msg: "Name and URL are required" });
+        }
+        const sql = `INSERT IGNORE INTO games_master_list (name, url) VALUES (?, ?)`;
+        await write.query(sql, [name, url]);
+        return res.status(200).send({ status: true, msg: "Game added successfully to master's list" });
     } catch (err) {
-        console.log(err)
-        return res.status(500).json({ msg: "Internal server Error", status: false })
+        // console.error("Error adding game to master's list:", err);
+        return res.status(500).json({ status: false, msg: "Internal server error", error: err.message });
     }
 }
+
 
 const findGame = async (req, res) => {
     try {
-
-        let token = req.headers.token;
-        let validateUser = await getRedis(token);
+        const token = req.headers.token;
+        let validateUser;
         try {
-            validateUser = JSON.parse(validateUser)
+            validateUser = JSON.parse(await getRedis(token));
         } catch (err) {
-            console.error(`[ERR] while parsing json data is::`, err);
-            return res.status(500).send({ status: false, msg: "Internal Server Error" })
+            console.error(`[ERR] Error parsing JSON data:`, err);
+            return res.status(500).send({ status: false, msg: "Internal Server Error" });
         }
-        if (validateUser) {
-            const [data] = await write.query("select * from operator_games as op right join games_master_list as gml on gml.game_id = op.game_id where operator_id = ?", [validateUser.operatorId]);
-            return res.status(200).send({ status: true, data })
-        } else {
-            return res.status(401).send({ status: false, msg: "Session expired.! Please login again." });
+        if (!validateUser) {
+            return res.status(401).send({ status: false, msg: "Session expired. Please login again." });
         }
-    } catch (er) {
-        console.log(er)
-        return res.status(500).json({ msg: "Internal server Error", status: false })
+        const { operatorId } = validateUser;
+        const sql = `SELECT *FROM operator_games AS opRIGHT JOIN games_master_list AS gml ON gml.game_id = op.game_idWHERE operator_id = ?`;
+        const [data] = await write.query(sql, [operatorId]);
+        return res.status(200).send({ status: true, data });
+    } catch (err) {
+        // console.error(`[ERR] Error fetching games:`, err);
+        return res.status(500).json({ msg: "Internal server Error", status: false });
     }
 }
+
 
 
 const operatorFindGame = async (req, res) => {
     try {
         const { token } = req.headers;
         const url = process.env.service_provider_url;
-        let config = {
+        const config = {
             method: 'GET',
             url: `${url}/service/operator/game`,
-            headers: {
-                token
-            }
+            headers: { token }
         };
-
-        await axios(config).then(data => {
-            if (data.status === 200) {
-                return res.status(200).send({ status: true, msg: "games list fetched successfully", data: data.data });
+        try {
+            const response = await axios(config);
+            if (response.status === 200) {
+                return res.status(200).send({ status: true, msg: "Games list fetched successfully", data: response.data });
+            } else {
+                return res.status(response.status).send({ status: false, msg: "Failed to fetch games list", data: response.data });
             }
-        }).catch(err => {
-            let data = err.response.data
-            return res.status(401).send( {...data , code : 401} );
-        })
-
-
-    } catch (er) {
-        // console.log(er)
-        return res.status(500).json({ msg: "Internal server Error", status: false })
+        } catch (err) {
+            // console.error(`[ERR] Error fetching games list:`, err);
+            return res.status(500).json({ msg: "Internal server Error", status: false });
+        }
+    } catch (err) {
+        // console.error(`[ERR] Error preparing request:`, err);
+        return res.status(500).json({ msg: "Internal server Error", status: false });
     }
 }
+
 
 const getGeame = async(req ,res)=>{
     try{
