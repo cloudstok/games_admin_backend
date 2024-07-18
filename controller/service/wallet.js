@@ -3,6 +3,7 @@ const { getRedis } = require('../../redis/connection');
 const { encryption } = require('../../utilities/ecryption-decryption');
 const { write } = require('../../db_config/db');
 const { getWebhookUrl } = require('../../utilities/common_function');
+const { sendToQueue} = require('../../utilities/amqp');
 
 const getUserBalance = async (req, res) => {
     try {
@@ -54,7 +55,7 @@ const getUserBalance = async (req, res) => {
 const updateUserBalance = async (req, res) => {
     try {
         const token = req.headers.token;
-        const { amount, txn_id, description, txn_ref_id, txn_type } = req.body;
+        const {  txn_id, amount, txn_ref_id, description, txn_type } = req.body;
         let validateUser;
         try {
             validateUser = JSON.parse(await getRedis(token));
@@ -80,31 +81,10 @@ const updateUserBalance = async (req, res) => {
             },
             data: { data: encryptedData }
         };
-        let status = 0;
-        // Execute HTTP request with Axios
-        await axios(options).then(async (response) => {
-            if (response.status === 200) {
-                status = 2;
-                await transaction([userId, token, operatorId, txn_id, amount, txn_ref_id || null, description, txn_type, status]);
-            } else {
-                status = txn_type === 1 ? 1 : 0;
-                const transaction_id = await transaction([userId, token, operatorId, txn_id, amount, txn_ref_id || null, description, txn_type, status]);
-                if (status === 1) {
-                    await rollback([transaction_id, 2, JSON.stringify({ ...req.body, token })]);
-                }
-                console.log(`Received an invalid response from upstream server`);
-            }
-
-            return res.status(response.status).send(response.data);
-        }).catch(async (err) => {
-            console.error("Error during HTTP request:", err);
-            status = txn_type === 1 ? 1 : 0;
-            const transaction_id = await transaction([userId, token, operatorId, txn_id, amount, txn_ref_id || null, description, txn_type, status]);
-            if (status === 1) {
-                await rollback([transaction_id, 2, JSON.stringify({ ...req.body, token })]);
-            }
-            return res.status(500).send({ status: false, msg: "Internal Server error" });
-        });
+        let db_data = { ...req.body, userId, token, operatorId}
+        const optionsWithRetry = { ...options, db_data};
+        await sendToQueue('', 'cashout_queue', JSON.stringify(optionsWithRetry), 1000);
+        return res.status(200).send({ status: true, msg: "Balance updated successfully"});
     } catch (err) {
         console.error("Error updating user balance:", err);
         return res.status(500).send({ status: false, msg: "Internal Server error" });
