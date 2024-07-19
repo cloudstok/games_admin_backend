@@ -47,7 +47,7 @@ const manualCashoutOrRollback = async (req, res) => {
         if (!operatorUrl) {
             return res.status(400).send({ status: false, msg: "No URL configured for the event" });
         }
-        await processEvent({ event, transaction, operatorUrl, secret, amount, description, txn_ref_id, user_id, session_token, backend_base_url, operator_id, id, res });
+        await processEvent({ event, transaction, operatorUrl, secret, amount, description, txn_ref_id, user_id, session_token, backend_base_url, operator_id, id, game_id, res });
     } catch (er) {
         console.error(er);
         return res.status(500).send({ status: false, msg: "internal server Error", er });
@@ -63,7 +63,7 @@ const isRetryLimitExceeded = (event, transaction) => {
     return (event === 'cashout' && cashout_retries >= 10) || (event === 'rollback' && rollback_retries >= 10);
 };
 
-const processEvent = async ({ event, transaction, operatorUrl, secret, amount, description, txn_ref_id, user_id, session_token, backend_base_url, operator_id, id, res }) => {
+const processEvent = async ({ event, transaction, operatorUrl, secret, amount, description, txn_ref_id, user_id, session_token, backend_base_url, operator_id, id, game_id, res }) => {
     let { options, cashout_retries, rollback_retries, transaction_id } = transaction;
     event === 'cashout' ? cashout_retries += 1 : rollback_retries += 1;
     const [getRollbackTransaction] = await write.query(`SELECT * FROM transaction WHERE txn_id = ?`, [txn_ref_id]);
@@ -190,7 +190,7 @@ const operatorRollback = async (req, res) => {
         const secret = operator.secret;
         const decodeData = await decryption(data, secret);
         const txn_ref_id = decodeData.txnRefId;
-        const [[{id, backend_base_url, game_id}]] = await getPendingTransaction(txn_ref_id);
+        const [[{ id, backend_base_url, game_id }]] = await getPendingTransaction(txn_ref_id);
         if (!id) {
             return res.status(400).send({ status: false, msg: "No Pending Credits for this Reference ID" });
         }

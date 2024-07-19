@@ -80,7 +80,7 @@ async function handleMessage(queue, msg) {
     if (queue === QUEUES.failed) {
         await sendNotificationToGame(queue, dbData);
         console.error(`Message permanently failed in ${queue}: ${JSON.stringify(message)}`);
-        subChannel.ack(msg); 
+        subChannel.ack(msg);
         return;
     }
 
@@ -94,7 +94,7 @@ async function handleMessage(queue, msg) {
         } else {
             console.error(`Request failed for ${queue}: ${response.status}`);
             const insertId = await handleFailure(queue, dbData, message, retries);
-            if(insertId){
+            if (insertId) {
                 dbData.transaction_id = insertId
             }
             await handleRetryOrMoveToNextQueue(queue, message, msg, retries, dbData);
@@ -102,7 +102,7 @@ async function handleMessage(queue, msg) {
     } catch (error) {
         console.error(`Request failed for ${queue}: ${error.message}`);
         const insertId = await handleFailure(queue, dbData, message, retries);
-        if(insertId){
+        if (insertId) {
             dbData.transaction_id = insertId
         }
         await handleRetryOrMoveToNextQueue(queue, message, msg, retries, dbData);
@@ -110,8 +110,8 @@ async function handleMessage(queue, msg) {
 }
 
 async function sendNotificationToGame(queue, data) {
-    let { operatorId, userId, amount, game_id, debit_description} = data;
-    const [[{backend_base_url}]] = await write.query(`SELECT backend_base_url FROM games_master_list where game_id = ?`, [game_id]);
+    let { operatorId, userId, amount, game_id, debit_description } = data;
+    const [[{ backend_base_url }]] = await write.query(`SELECT backend_base_url FROM games_master_list where game_id = ?`, [game_id]);
     let postData = {
         userId, operatorId
     }
@@ -123,7 +123,7 @@ async function sendNotificationToGame(queue, data) {
     }
     const options = {
         method: 'POST',
-        url:backend_base_url + '/settleBet',
+        url: backend_base_url + '/settleBet',
         headers: {
             'Content-Type': 'application/json',
         },
@@ -143,8 +143,8 @@ async function sendNotificationToGame(queue, data) {
 
 
 async function executeSuccessQueries(queue, responseData) {
-    const { userId, token, operatorId, txn_id, amount, txn_ref_id, description, txn_type , game_id, transaction_id } = responseData;
-    await write.query("INSERT IGNORE INTO transaction (user_id, game_id , session_token , operator_id, txn_id, amount,  txn_ref_id , description, txn_type, txn_status) VALUES (?)", [[userId, game_id ,token, operatorId, txn_id, amount, txn_ref_id, description, `${txn_type}`, '2']]);
+    const { userId, token, operatorId, txn_id, amount, txn_ref_id, description, txn_type, game_id, transaction_id } = responseData;
+    await write.query("INSERT IGNORE INTO transaction (user_id, game_id , session_token , operator_id, txn_id, amount,  txn_ref_id , description, txn_type, txn_status) VALUES (?)", [[userId, game_id, token, operatorId, txn_id, amount, txn_ref_id, description, `${txn_type}`, '2']]);
     console.log(`Successful ${queue} transaction logged to db`);
     if (queue === QUEUES.rollback) {
         const updateTransaction = write.query(`UPDATE transaction SET txn_status = "0" WHERE txn_ref_id = ? and txn_type = '1'`, [txn_ref_id]);
@@ -164,8 +164,8 @@ async function handleFailure(queue, data, message, retries) {
 }
 
 async function executeCashoutFailureQueries(data, message) {
-    const { userId, token, operatorId, txn_id, amount, txn_ref_id, description, txn_type ,game_id } = data;
-    const [{ insertId }] = await write.query("INSERT IGNORE INTO transaction (user_id,game_id, session_token , operator_id, txn_id, amount,  txn_ref_id , description, txn_type, txn_status) VALUES (?)", [[userId,game_id, token, operatorId, txn_id, amount, txn_ref_id, description, `${txn_type}`, '1']]);
+    const { userId, token, operatorId, txn_id, amount, txn_ref_id, description, txn_type, game_id } = data;
+    const [{ insertId }] = await write.query("INSERT IGNORE INTO transaction (user_id,game_id, session_token , operator_id, txn_id, amount,  txn_ref_id , description, txn_type, txn_status) VALUES (?)", [[userId, game_id, token, operatorId, txn_id, amount, txn_ref_id, description, `${txn_type}`, '1']]);
     await write.query("INSERT IGNORE INTO pending_transactions (transaction_id, game_id, options) VALUES (?)", [[insertId, game_id, JSON.stringify(message)]]);
     console.log('As Cashout queue is failed, inserting pending transaction for further future manual rollback or cashout retry');
     return insertId;
@@ -199,10 +199,10 @@ async function handleRetryOrMoveToNextQueue(currentQueue, message, originalMsg, 
         setTimeout(async () => {
             try {
                 await sendToQueue('', currentQueue, JSON.stringify(message), RETRY_DELAY_MS, retries);
-                subChannel.ack(originalMsg); 
+                subChannel.ack(originalMsg);
             } catch (error) {
                 console.error(`Failed to retry message in ${currentQueue}: ${error.message}`);
-                subChannel.nack(originalMsg); 
+                subChannel.nack(originalMsg);
             }
         }, RETRY_DELAY_MS);
     } else {
@@ -211,7 +211,7 @@ async function handleRetryOrMoveToNextQueue(currentQueue, message, originalMsg, 
         retries = 0;
         try {
             await sendToQueue('', nextQueue, JSON.stringify(message), 0, retries);
-            subChannel.ack(originalMsg); 
+            subChannel.ack(originalMsg);
         } catch (error) {
             console.error(`Failed to move message from ${currentQueue} to ${nextQueue}: ${error.message}`);
             subChannel.nack(originalMsg);
