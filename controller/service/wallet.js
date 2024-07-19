@@ -55,7 +55,7 @@ const getUserBalance = async (req, res) => {
 const updateUserBalance = async (req, res) => {
     try {
         const token = req.headers.token;
-        const {  txn_id, amount, txn_ref_id, description, txn_type } = req.body;
+        const {  txn_id, amount, txn_ref_id, description, txn_type, game_id } = req.body;
         let validateUser;
         try {
             validateUser = JSON.parse(await getRedis(token));
@@ -71,7 +71,7 @@ const updateUserBalance = async (req, res) => {
         if (!operatorUrl) {
             return res.status(400).send({ status: false, msg: "No URL configured for the event" });
         }
-        const encryptedData = await encryption({ amount, txn_id, description, txn_type, txn_ref_id }, secret);
+        const encryptedData = await encryption({ amount, txn_id, description, txn_type, txn_ref_id  , game_id}, secret);
         const options = {
             method: 'POST',
             url: operatorUrl,
@@ -91,29 +91,6 @@ const updateUserBalance = async (req, res) => {
     }
 }
 
-
-
-const transaction = async (data) => {
-    try {
-        let sql = "INSERT IGNORE INTO transaction (user_id, session_token , operator_id, txn_id, amount,  txn_ref_id , description, txn_type, txn_status) VALUES (?)";
-        const [{ insertId }] = await write.query(sql, [data])
-        return insertId
-    } catch (e) {
-        console.error("Error while inserting transaction:", error);
-        throw new Error("Failed to execute transaction insertion");
-    }
-}
-
-const rollback = async (data) => {
-    try {
-        const sql_rollback_detail = "INSERT IGNORE INTO pending_transactions (transaction_id, game_id, options) VALUES (?)";
-        const [{ insertId }] = await write.query(sql_rollback_detail, [data]);
-        return insertId;
-    } catch (error) {
-        console.error("Error during rollback:", error);
-        throw new Error("Failed to execute rollback operation");
-    }
-}
 
 
 module.exports = { getUserBalance, updateUserBalance }

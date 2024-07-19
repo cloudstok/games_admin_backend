@@ -26,7 +26,7 @@ const fetchBetsData = async (limit, offset) => {
 //Admin Rollback or Cashout Retry
 const manualCashoutOrRollback = async (req, res) => {
     try {
-        const { id, event, operator_id, description, amount, txn_ref_id, user_id, session_token, backend_base_url } = req.body;
+        const { id, event, operator_id, description, amount, txn_ref_id, user_id, session_token, backend_base_url, game_id } = req.body;
         const [getTransaction] = await write.query(`SELECT * FROM pending_transactions where id = ? and txn_status = '1'`, [id]);
         if (getTransaction.length === 0) {
             return res.status(400).send({ status: false, msg: "No pending history found for the transaction id" });
@@ -78,7 +78,7 @@ const processEvent = async ({ event, transaction, operatorUrl, secret, amount, d
     try {
         const data = await axios(requestOptions);
         if (data.status === 200) {
-            await handleSuccessEvent({ event, webhookData, backend_base_url, user_id, operator_id, session_token, getRollbackTransaction, id, transaction_id, res });
+            await handleSuccessEvent({ event, webhookData, backend_base_url, user_id, operator_id, session_token, getRollbackTransaction, id, transaction_id, game_id, res });
         } else {
             await handleErrorEvent(cashout_retries, rollback_retries, transaction_id, id, res);
         }
@@ -87,7 +87,7 @@ const processEvent = async ({ event, transaction, operatorUrl, secret, amount, d
     }
 };
 
-const handleSuccessEvent = async ({ event, webhookData, backend_base_url, user_id, operator_id, session_token, getRollbackTransaction, id, transaction_id, res }) => {
+const handleSuccessEvent = async ({ event, webhookData, backend_base_url, user_id, operator_id, session_token, getRollbackTransaction, id, transaction_id, game_id, res }) => {
     delete webhookData.token;
     const options = {
         method: 'POST',
@@ -112,7 +112,7 @@ const handleSuccessEvent = async ({ event, webhookData, backend_base_url, user_i
     } catch (err) {
         console.error(`[Error] Response from game for ${event} event is:::`, JSON.stringify(err?.response?.data));
     }
-    await finalizeTransaction(event, webhookData, transaction_id, id, user_id, session_token, operator_id);
+    await finalizeTransaction(event, webhookData, transaction_id, id, user_id, session_token, operator_id, game_id);
     return res.status(200).send({ status: true, msg: `Bet successfully settled for ${event} event` });
 };
 
@@ -143,7 +143,7 @@ const handleErrorEvent = async (cashout_retries, rollback_retries, transaction_i
 };
 
 
-const finalizeTransaction = async (event, webhookData, transaction_id, id, user_id, session_token, operator_id) => {
+const finalizeTransaction = async (event, webhookData, transaction_id, id, user_id, session_token, operator_id, game_id) => {
     const connection = await write.getConnection();
 
     try {
@@ -155,7 +155,7 @@ const finalizeTransaction = async (event, webhookData, transaction_id, id, user_
             await Promise.all([updateTransaction, updatePendingTransaction]);
         } else {
             webhookData.txn_type = `${webhookData.txn_type}`;
-            const insertRollbackTransaction = connection.query(`INSERT IGNORE INTO transaction (user_id, session_token, operator_id, txn_id, amount, txn_ref_id, description, txn_type, txn_status) VALUES (?)`, [[user_id, session_token, operator_id, ...Object.values(webhookData), '2']]);
+            const insertRollbackTransaction = connection.query(`INSERT IGNORE INTO transaction (user_id, game_id, session_token, operator_id, txn_id, amount, txn_ref_id, description, txn_type, txn_status) VALUES (?)`, [[user_id, game_id, session_token, operator_id, ...Object.values(webhookData), '2']]);
             const updateTransaction = connection.query(`UPDATE transaction SET txn_status = '0' WHERE id = ?`, [transaction_id]);
             const updatePendingTransaction = connection.query(`UPDATE pending_transactions SET event = 'rollback', txn_status = '2' WHERE id = ?`, [id]);
             await Promise.all([insertRollbackTransaction, updateTransaction, updatePendingTransaction]);
@@ -190,8 +190,8 @@ const operatorRollback = async (req, res) => {
         const secret = operator.secret;
         const decodeData = await decryption(data, secret);
         const txn_ref_id = decodeData.txnRefId;
-        const pendingTransaction = await getPendingTransaction(txn_ref_id);
-        if (pendingTransaction.length === 0) {
+        const [[{id, backend_base_url, game_id}]] = await getPendingTransaction(txn_ref_id);
+        if (!id) {
             return res.status(400).send({ status: false, msg: "No Pending Credits for this Reference ID" });
         }
         const rollbackTransaction = await getRollbackTransaction(txn_ref_id);
@@ -208,9 +208,9 @@ const operatorRollback = async (req, res) => {
             txn_type: 2
         };
 
-        const response = await sendRollbackRequest(pendingTransaction[0].backend_base_url, transactionData, userId, operatorId, rollbackTransaction[0].description, token, secret);
+        const response = await sendRollbackRequest(backend_base_url, transactionData, userId, operatorId, rollbackTransaction[0].description, token, secret);
         if (response?.status === 200) {
-            await finalizeRollback(userId, token, operatorId, transactionId, rollbackAmount, txn_ref_id, transactionData.description, pendingTransaction[0].transaction_id);
+            await finalizeRollback(userId, token, operatorId, transactionId, rollbackAmount, txn_ref_id, transactionData.description, id, game_id);
             return res.status(200).send({ status: true, msg: `Bet rollback-ed successfully for reference ID ${txn_ref_id}`, data: await encryption(transactionData, secret) });
         } else {
             return res.status(response.status).send({ status: false, msg: `Request failed from upstream server with response:: ${JSON.stringify(response.data)}` });
@@ -243,7 +243,7 @@ const getOperator = async (operatorId) => {
 
 const getPendingTransaction = async (txn_ref_id) => {
     try {
-        const [getPendingTransaction] = await write.query(`SELECT * FROM transaction as tr inner join pending_transactions as pt on pt.transaction_id = tr.id inner join games_master_list as gm on gm.game_id = pt.game_id WHERE tr.txn_ref_id = ? and tr.txn_type = '1' and tr.txn_status = '1'`, [txn_ref_id]);
+        const [getPendingTransaction] = await write.query(`SELECT gm.backend_base_url, tr.id, gm.game_id FROM transaction as tr inner join inner join games_master_list as gm on gm.game_id = tr.game_id WHERE tr.txn_ref_id = ? and tr.txn_type = '1' and tr.txn_status = '1'`, [txn_ref_id]);
         return getPendingTransaction;
     } catch (error) {
         console.error('Error fetching pending transaction:', error);
@@ -276,11 +276,11 @@ const sendRollbackRequest = async (backendBaseUrl, data, userId, operatorId, rol
     }
 };
 
-const finalizeRollback = async (userId, token, operatorId, transactionId, rollbackAmount, txn_ref_id, description, pendingTransactionId) => {
+const finalizeRollback = async (userId, token, operatorId, transactionId, rollbackAmount, txn_ref_id, description, pendingTransactionId, game_id) => {
     const connection = await write.getConnection();
     try {
         await connection.beginTransaction();
-        const insertTransaction = connection.query(`INSERT IGNORE INTO transaction (user_id, session_token, operator_id, txn_id, amount, txn_ref_id, description, txn_type, txn_status) VALUES (?)`, [[userId, token, operatorId, transactionId, rollbackAmount, txn_ref_id, description, '2', '2']]);
+        const insertTransaction = connection.query(`INSERT IGNORE INTO transaction (user_id, game_id, session_token, operator_id, txn_id, amount, txn_ref_id, description, txn_type, txn_status) VALUES (?)`, [[userId, game_id, token, operatorId, transactionId, rollbackAmount, txn_ref_id, description, '2', '2']]);
         const updatePendingTransaction = connection.query(`UPDATE pending_transactions SET event = 'rollback', txn_status = '2' WHERE transaction_id = ?`, [pendingTransactionId]);
         const updateTransaction = connection.query(`UPDATE transaction SET txn_status = '0' WHERE id = ?`, [pendingTransactionId]);
         await Promise.all([insertTransaction, updatePendingTransaction, updateTransaction]);

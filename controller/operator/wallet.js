@@ -104,7 +104,7 @@ const updateBalance = async (req, res) => {
             return res.status(400).send({ status: false, msg: "Invalid Operator requested" });
         }
         const { secret } = getOperator[0];
-        const { amount, txn_type } = await decryption(data, secret);
+        const { amount, txn_type  , game_id} = await decryption(data, secret);
         let query = '';
         if (txn_type === 1) {
             query = `UPDATE user_wallet SET balance = balance + ? WHERE user_id = ?`;

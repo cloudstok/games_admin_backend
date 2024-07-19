@@ -37,8 +37,8 @@ CREATE TABLE `operator` (
 CREATE TABLE `games_master_list` (
     game_id int not null AUTO_INCREMENT,
     name varchar(60) unique not null,
-    url varchar(255) unique ,
-    backend_base_url varchar(255) unique ,
+    url varchar(255) unique,
+    backend_base_url varchar(255) unique,
     image varchar(255) default null,
     is_active boolean default true,
     created_at timestamp NULL DEFAULT CURRENT_TIMESTAMP,
@@ -77,7 +77,7 @@ INSERT INTO
         `user_type`
     )
 values
-(
+    (
         'cloudstok',
         'cloudstok_6655',
         '$2b$10$GZeHWlklKMCtMMfzHtdaU.CjqfhXIN4AMUh1X7tAduxjUohSxIXM2',
@@ -90,19 +90,17 @@ values
 insert into
     games_master_list (name, url, backend_base_url, image)
 values
-(
+    (
         'AVIATOR',
         'https://aviator.ayodhya365.co/',
         'https://ayodhya365.co/',
         'https://jaunpur123.s3.ap-south-1.amazonaws.com/1717673785290_aviator-pic.jpg'
     );
 
-
-
-    insert into
+insert into
     games_master_list (name, url, backend_base_url, image)
 values
-(
+    (
         'crash royale',
         'https://crashroyal.wings365.in/',
         'https://wings365.in',
@@ -112,11 +110,12 @@ values
 CREATE TABLE transaction (
     id int primary key auto_increment,
     user_id varchar(255),
+    game_id varchar(255),
     session_token varchar(255),
     operator_id varchar(30),
     txn_id VARCHAR(255) unique not null,
     amount varchar(30),
-    txn_ref_id varchar(255) default null, 
+    txn_ref_id varchar(255) default null,
     description varchar(255),
     txn_type enum('0', '1', '2'),
     txn_status enum('0', '1', '2') default '1',
@@ -132,7 +131,6 @@ CREATE TABLE webhook_config (
     created_at timestamp default CURRENT_TIMESTAMP,
     updated_at timestamp default CURRENT_TIMESTAMP
 );
-
 
 create table pending_transactions(
     id int primary key auto_increment,

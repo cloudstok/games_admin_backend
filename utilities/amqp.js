@@ -93,32 +93,37 @@ async function handleMessage(queue, msg) {
             subChannel.ack(msg);
         } else {
             console.error(`Request failed for ${queue}: ${response.status}`);
-            await handleFailure(queue, dbData, message, retries);
+            const insertId = await handleFailure(queue, dbData, message, retries);
+            if(insertId){
+                dbData.transaction_id = insertId
+            }
             await handleRetryOrMoveToNextQueue(queue, message, msg, retries, dbData);
         }
     } catch (error) {
         console.error(`Request failed for ${queue}: ${error.message}`);
-        await handleFailure(queue, dbData, message, retries);
+        const insertId = await handleFailure(queue, dbData, message, retries);
+        if(insertId){
+            dbData.transaction_id = insertId
+        }
         await handleRetryOrMoveToNextQueue(queue, message, msg, retries, dbData);
     }
 }
 
 async function sendNotificationToGame(queue, data) {
-    let { operatorId, userId, amount, txn_ref_id } = data;
-    const [getPendingTransaction] = await write.query(`SELECT * FROM transaction as tr inner join pending_transactions as pt on pt.transaction_id = tr.id inner join games_master_list as gm on gm.game_id = pt.game_id WHERE tr.txn_ref_id = ? and tr.txn_type = '1' and tr.txn_status = '1'`, [txn_ref_id]);
-    const [getDebitTransaction] = await write.query(`SELECT * FROM transaction WHERE txn_id = ? and type_type = '0'`, [txn_ref_id]);
+    let { operatorId, userId, amount, game_id, debit_description} = data;
+    const [[{backend_base_url}]] = await write.query(`SELECT backend_base_url FROM games_master_list where game_id = ?`, [game_id]);
     let postData = {
         userId, operatorId
     }
     postData.amount = queue === QUEUES.failed ? null : amount;
     if (queue === QUEUES.failed) {
-        postData.description = `Due to some technical issues, Your credit is in process for ROUND ${getDebitTransaction[0].description.split(' ')[7]}`;
+        postData.description = `Due to some technical issues, Your credit is in process for ROUND ${debit_description.split(' ')[7]}`;
     } else {
-        postData.rollbackMsg = getDebitTransaction[0].description;
+        postData.rollbackMsg = debit_description;
     }
     const options = {
         method: 'POST',
-        url: getPendingTransaction[0].backend_base_url + '/settleBet',
+        url:backend_base_url + '/settleBet',
         headers: {
             'Content-Type': 'application/json',
         },
@@ -138,12 +143,12 @@ async function sendNotificationToGame(queue, data) {
 
 
 async function executeSuccessQueries(queue, responseData) {
-    const { userId, token, operatorId, txn_id, amount, txn_ref_id, description, txn_type } = responseData;
-    await write.query("INSERT IGNORE INTO transaction (user_id, session_token , operator_id, txn_id, amount,  txn_ref_id , description, txn_type, txn_status) VALUES (?)", [[userId, token, operatorId, txn_id, amount, txn_ref_id, description, `${txn_type}`, '2']]);
+    const { userId, token, operatorId, txn_id, amount, txn_ref_id, description, txn_type , game_id, transaction_id } = responseData;
+    await write.query("INSERT IGNORE INTO transaction (user_id, game_id , session_token , operator_id, txn_id, amount,  txn_ref_id , description, txn_type, txn_status) VALUES (?)", [[userId, game_id ,token, operatorId, txn_id, amount, txn_ref_id, description, `${txn_type}`, '2']]);
     console.log(`Successful ${queue} transaction logged to db`);
     if (queue === QUEUES.rollback) {
         const updateTransaction = write.query(`UPDATE transaction SET txn_status = "0" WHERE txn_ref_id = ? and txn_type = '1'`, [txn_ref_id]);
-        const updatePendingTransaction = write.query(`UPDATE pending_transaction SET event = 'rollback', txn_status = '0' WHERE transaction_id = (SELECT id from transaction where WHERE txn_ref_id = ? and txn_type = '1')`, [txn_ref_id]);
+        const updatePendingTransaction = write.query(`UPDATE pending_transaction SET event = 'rollback', txn_status = '0' WHERE transaction_id = ?`, [transaction_id]);
         await Promise.all([updateTransaction, updatePendingTransaction]);
     }
 }
@@ -151,16 +156,19 @@ async function executeSuccessQueries(queue, responseData) {
 
 
 async function handleFailure(queue, data, message, retries) {
+    let insertId = null;
     if (queue === QUEUES.cashout && retries === 10) {
-        await executeCashoutFailureQueries(data, message);
+        insertId = await executeCashoutFailureQueries(data, message);
     }
+    return insertId;
 }
 
 async function executeCashoutFailureQueries(data, message) {
-    const { userId, token, operatorId, txn_id, amount, txn_ref_id, description, txn_type } = data;
-    const [{ insertId }] = await write.query("INSERT IGNORE INTO transaction (user_id, session_token , operator_id, txn_id, amount,  txn_ref_id , description, txn_type, txn_status) VALUES (?)", [[userId, token, operatorId, txn_id, amount, txn_ref_id, description, `${txn_type}`, '1']]);
-    await write.query("INSERT IGNORE INTO pending_transactions (transaction_id, game_id, options) VALUES (?)", [[insertId, 2, JSON.stringify(message)]]);
+    const { userId, token, operatorId, txn_id, amount, txn_ref_id, description, txn_type ,game_id } = data;
+    const [{ insertId }] = await write.query("INSERT IGNORE INTO transaction (user_id,game_id, session_token , operator_id, txn_id, amount,  txn_ref_id , description, txn_type, txn_status) VALUES (?)", [[userId,game_id, token, operatorId, txn_id, amount, txn_ref_id, description, `${txn_type}`, '1']]);
+    await write.query("INSERT IGNORE INTO pending_transactions (transaction_id, game_id, options) VALUES (?)", [[insertId, game_id, JSON.stringify(message)]]);
     console.log('As Cashout queue is failed, inserting pending transaction for further future manual rollback or cashout retry');
+    return insertId;
 }
 
 
@@ -174,6 +182,7 @@ async function handleRetryOrMoveToNextQueue(currentQueue, message, originalMsg, 
         }
         const [operator] = await write.query(`SELECT * FROM operator where user_id = ?`, [dbData.operatorId]);
         message.data.data = await encryption(rollbackData, operator[0].secret);
+        dbData.debit_description = getRollbackTransaction[0].description
         for (const key in rollbackData) {
             if (rollbackData.hasOwnProperty(key)) {
                 dbData[key] = rollbackData[key];
