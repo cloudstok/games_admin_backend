@@ -55,7 +55,7 @@ const getUserBalance = async (req, res) => {
 const updateUserBalance = async (req, res) => {
     try {
         const token = req.headers.token;
-        const {  txn_id, amount, txn_ref_id, description, txn_type, game_id } = req.body;
+        const {  txn_id, amount, txn_ref_id, description, txn_type, ip, game_id } = req.body;
         let validateUser;
         try {
             validateUser = JSON.parse(await getRedis(token));
@@ -71,7 +71,7 @@ const updateUserBalance = async (req, res) => {
         if (!operatorUrl) {
             return res.status(400).send({ status: false, msg: "No URL configured for the event" });
         }
-        const encryptedData = await encryption({ amount, txn_id, description, txn_type, txn_ref_id  , game_id}, secret);
+        const encryptedData = await encryption({ amount, txn_id, description, txn_type, txn_ref_id, ip, game_id }, secret);
         const options = {
             method: 'POST',
             url: operatorUrl,
