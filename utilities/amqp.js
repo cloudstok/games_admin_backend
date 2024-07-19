@@ -80,7 +80,7 @@ async function handleMessage(queue, msg) {
     if (queue === QUEUES.failed) {
         await sendNotificationToGame(queue, dbData);
         console.error(`Message permanently failed in ${queue}: ${JSON.stringify(message)}`);
-        subChannel.ack(msg); // Acknowledge the message in the failed queue
+        subChannel.ack(msg); 
         return;
     }
 
