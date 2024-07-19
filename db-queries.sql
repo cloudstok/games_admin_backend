@@ -110,7 +110,7 @@ values
 CREATE TABLE transaction (
     id int primary key auto_increment,
     user_id varchar(255),
-    game_id varchar(255),
+    game_id varchar(60),
     session_token varchar(255),
     operator_id varchar(30),
     txn_id VARCHAR(255) unique not null,
