@@ -29,7 +29,7 @@ const rollbacklist = async (req, res) => {
         if (isNaN(limit) || isNaN(offset)) {
             return res.status(400).send({ status: false, msg: "Invalid limit or offset" });
         }
-       
+
         const sql = `SELECT  * FROM pending_transactions as p inner join  transaction  as t on p.transaction_id = t.id inner join games_master_list as g on g.game_id = p.game_id where g.is_active = 1 AND p.txn_status = '1'  limit ? offset ? `;
         const [data] = await read.query(sql, [limit, offset])
         return res.status(200).send({ status: true, msg: "Transactions fetched successfully", data })

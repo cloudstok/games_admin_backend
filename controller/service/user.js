@@ -38,54 +38,6 @@ const logout = async (req, res) => {
     }
 };
 
-
-
-
-
-// const getUserDetail = async (req, res) => {
-//     try {
-//         const token = req.headers.token;
-//         let validateUser = await getRedis(token);
-//         try {
-//             validateUser = JSON.parse(validateUser);
-//         } catch (err) {
-//             return res.status(400).send({ status: false, msg: "We've encountered an internal error" })
-//         }
-//         if (validateUser) {
-//             let {operatorId} = validateUser;
-//             let operatorUrl = await getWebhookUrl(operatorId, "USER_DETAILS")
-//             // let operatorUrl = process.env.operator_base_url;
-//             if(operatorUrl){
-//                 const options = {
-//                     method: 'GET',
-//                     url: operatorUrl,
-//                     headers: {
-//                         'Content-Type': 'application/json',
-//                         token
-//                     }
-//                 };
-//                 await axios(options).then(data => {
-//                     if (data.status === 200) {
-//                         return res.status(200).send(data.data);
-//                     } else {
-//                         console.log(`received an invalid response from upstream server`);
-//                         return res.status(data.status).send({ status: false, msg: `Request failed from upstream server with response:: ${JSON.stringify(data)}` })
-//                     }
-//                 }).catch(err => {
-//                     return res.status(400).send(err?.response?.data);
-//                 })
-//             }else{
-//                 return res.status(400).send({ status: false, msg: "No URL configured for the event"});
-//             }
-//         } else {
-//             return res.status(400).send({ status: false, msg: "Invalid Token or session timed out" });
-//         }
-//     } catch (err) {
-//         console.error(`[Err] while trying to get user balance is:::`, err)
-//         res.status(500).send({ status: false, msg: "Internal Server error" });
-//     }
-// }
-
 const getUserDetail = async (req, res) => {
     try {
         const token = req.headers.token;

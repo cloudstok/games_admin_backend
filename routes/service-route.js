@@ -21,8 +21,6 @@ serviceRouter.post('/register/game', verifyToken, serviceAddGame)
 serviceRouter.get('/games/list', verifyToken, getMasterListGames);
 serviceRouter.get('/game/operator/:operator_id', verifyToken, getOperatorGamesForService);
 serviceRouter.post('/register/operator/game', verifyToken, addGameForOperator);
-
-// find game
 serviceRouter.get('/game/url', getGameURL);
 
 
