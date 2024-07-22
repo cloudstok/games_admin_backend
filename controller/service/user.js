@@ -73,7 +73,7 @@ const getUserDetail = async (req, res) => {
                 return res.status(response.status).send({ status: false, msg: `Request failed from upstream server with response: ${JSON.stringify(response.data)}` });
             }
         } catch (err) {
-            console.error("Error during HTTP request:", err);
+            console.error("Error during HTTP request:", err?.response?.data);
             return res.status(500).send({ status: false, msg: "Internal Server error" });
         }
     } catch (err) {

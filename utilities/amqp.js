@@ -9,6 +9,7 @@ let connected = false;
 const MAX_RETRIES = 10;
 const RETRY_DELAY_MS = 1000;
 const QUEUES = {
+    debit: 'debit_queue',
     cashout: 'cashout_queue',
     rollback: 'rollback_queue',
     failed: 'failed_queue'
@@ -110,10 +111,10 @@ async function handleMessage(queue, msg) {
 }
 
 async function sendNotificationToGame(queue, data) {
-    let { operatorId, userId, amount, game_id, debit_description } = data;
+    let { operatorId, userId, amount, game_id, debit_description, socket_id, bet_id, txn_type, token } = data;
     const [[{ backend_base_url }]] = await write.query(`SELECT backend_base_url FROM games_master_list where game_id = ?`, [game_id]);
     let postData = {
-        userId, operatorId
+        userId, operatorId, txn_type, bet_id, socket_id, token
     }
     postData.amount = queue === QUEUES.failed ? null : amount;
     if (queue === QUEUES.failed) {
@@ -157,7 +158,7 @@ async function executeSuccessQueries(queue, responseData) {
 
 async function handleFailure(queue, data, message, retries) {
     let insertId = null;
-    if (queue === QUEUES.cashout && retries === 10) {
+    if ((queue === QUEUES.cashout && retries === 10) || (queue === QUEUES.debit)) {
         insertId = await executeCashoutFailureQueries(data, message);
     }
     return insertId;
@@ -165,10 +166,15 @@ async function handleFailure(queue, data, message, retries) {
 
 async function executeCashoutFailureQueries(data, message) {
     const { userId, token, operatorId, txn_id, amount, txn_ref_id, description, txn_type, game_id } = data;
-    const [{ insertId }] = await write.query("INSERT IGNORE INTO transaction (user_id,game_id, session_token , operator_id, txn_id, amount,  txn_ref_id , description, txn_type, txn_status) VALUES (?)", [[userId, game_id, token, operatorId, txn_id, amount, txn_ref_id, description, `${txn_type}`, '1']]);
-    await write.query("INSERT IGNORE INTO pending_transactions (transaction_id, game_id, options) VALUES (?)", [[insertId, game_id, JSON.stringify(message)]]);
-    console.log('As Cashout queue is failed, inserting pending transaction for further future manual rollback or cashout retry');
-    return insertId;
+    if(data.txn_type === 0){
+        console.log('As Cashout queue is failed and transaction type is DEBIT retry is not permittted, inserting failed debit transaction');
+        await write.query("INSERT IGNORE INTO transaction (user_id,game_id, session_token , operator_id, txn_id, amount,  txn_ref_id , description, txn_type, txn_status) VALUES (?)", [[userId, game_id, token, operatorId, txn_id, amount, txn_ref_id, description, `${txn_type}`, '0']]);
+    }else{
+        const [{ insertId }] = await write.query("INSERT IGNORE INTO transaction (user_id,game_id, session_token , operator_id, txn_id, amount,  txn_ref_id , description, txn_type, txn_status) VALUES (?)", [[userId, game_id, token, operatorId, txn_id, amount, txn_ref_id, description, `${txn_type}`, '1']]);
+        await write.query("INSERT IGNORE INTO pending_transactions (transaction_id, game_id, options) VALUES (?)", [[insertId, game_id, JSON.stringify(message)]]);
+        console.log('As Cashout queue is failed, inserting pending transaction for further future manual rollback or cashout retry');
+        return insertId;
+    }
 }
 
 
@@ -188,6 +194,13 @@ async function handleRetryOrMoveToNextQueue(currentQueue, message, originalMsg, 
                 dbData[key] = rollbackData[key];
             }
         }
+    }
+
+    if (currentQueue === QUEUES.debit) {
+        console.error(`As DEBIT event is failed in queue ${currentQueue}, initiated failed bet request to the game`);
+        await sendNotificationToGame(currentQueue, dbData);
+        subChannel.ack(originalMsg);
+        return;
     }
 
     message.db_data = dbData;

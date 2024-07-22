@@ -24,11 +24,12 @@ async function initializeQueues() {
         await connect(); // Establishing AMQP Connection
 
         const Queues = {
+            debit: 'debit_queue',
             cashout: 'cashout_queue',
             rollback: 'rollback_queue',
             failed: 'failed_queue'
         };
-
+        consumeQueue(Queues.debit, handleMessage);
         consumeQueue(Queues.cashout, handleMessage);
         consumeQueue(Queues.rollback, handleMessage);
         consumeQueue(Queues.failed, handleMessage);

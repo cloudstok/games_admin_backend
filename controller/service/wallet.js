@@ -55,7 +55,7 @@ const getUserBalance = async (req, res) => {
 const updateUserBalance = async (req, res) => {
     try {
         const token = req.headers.token;
-        const { txn_id, amount, txn_ref_id, description, txn_type, ip, game_id } = req.body;
+        const { txn_id, amount, txn_ref_id, description, txn_type, ip, game_id, socket_id, bet_id } = req.body;
         let validateUser;
         try {
             validateUser = JSON.parse(await getRedis(token));
@@ -81,9 +81,10 @@ const updateUserBalance = async (req, res) => {
             },
             data: { data: encryptedData }
         };
-        let db_data = { ...req.body, userId, token, operatorId }
+        let db_data = { ...req.body, userId, token, operatorId, socket_id, bet_id }
         const optionsWithRetry = { ...options, db_data };
-        await sendToQueue('', 'cashout_queue', JSON.stringify(optionsWithRetry), 1000);
+        let queue = txn_type === 0 ? 'debit_queue' : 'cashout_queue';
+        await sendToQueue('', queue, JSON.stringify(optionsWithRetry), 1000);
         return res.status(200).send({ status: true, msg: "Balance updated successfully" });
     } catch (err) {
         console.error("Error updating user balance:", err);
