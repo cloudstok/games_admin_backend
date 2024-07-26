@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const {write} = require('../db_config/db');
 async function generateRandomString(length) {
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()";
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     let randomString = "";
     for (let i = 0; i < length; i++) {
       randomString += chars[Math.floor(Math.random() * chars.length)];
