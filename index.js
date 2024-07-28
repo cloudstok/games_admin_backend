@@ -13,7 +13,7 @@ app.use(cors());
 app.use(express.json());
 app.use('/operator', operatorRouter);
 app.use('/service', serviceRouter);
-
+// (async ()=> deleteRedis('users'))();
 app.listen(PORT, () => {
     console.log(`Server listening at PORT ${PORT}`);
     initializeQueues();
