@@ -137,7 +137,7 @@ const userLogin = async (req, res) => {
         await setRedis('users', JSON.stringify([token]), 3600 * 24)
       }
       url = decodeData?.url ? decodeData.url : url;
-      await setRedis(token, JSON.stringify({ userId: decodeData.user_id, operatorId: user_id, pub_key, secret, url }), 7200)
+      await setRedis(token, JSON.stringify({ userId: decodeData.user_id, operatorId: user_id, pub_key, secret, url }), 3600 * 24)
       return res.status(200).send({ status: true, msg: "User authenticated", token });
     } else {
       return res.status(400).send({ status: false, msg: "Request initiated for Invalid Operator" });
