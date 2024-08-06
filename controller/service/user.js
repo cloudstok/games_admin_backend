@@ -1,7 +1,9 @@
-const { getRedis, deleteRedis, setRedis } = require("../../redis/connection");
+const { getRedis,  setRedis } = require("../../redis/connection");
 const { getWebhookUrl } = require("../../utilities/common_function");
-const { encryption } = require("../../utilities/ecryption-decryption");
 const axios = require('axios');
+const getLogger = require('../../utilities/logger');
+const GET_USER_DETAIL = getLogger('USER_DETAIL', 'jsonl');
+
 
 
 const activeUser = async (req, res) => {
@@ -37,50 +39,82 @@ const logout = async (req, res) => {
         return res.status(500).json({ msg: "Internal server Error", status: false });
     }
 };
-
+// user Detail
 const getUserDetail = async (req, res) => {
+    const token = req.headers.token;
+    GET_USER_DETAIL.info('Received request', { token });
+    let validateUser;
     try {
-        const token = req.headers.token;
-        let validateUser;
-        try {
-            validateUser = JSON.parse(await getRedis(token));
-        } catch (err) {
-            console.error("Error parsing Redis token:", err);
-            return res.status(400).send({ status: false, msg: "We've encountered an internal error" });
-        }
-        if (!validateUser) {
-            return res.status(401).send({ status: false, msg: "Invalid Token or session timed out" });
-        }
-        const { operatorId } = validateUser;
-        const operatorUrl = await getWebhookUrl(operatorId, "USER_DETAILS");
-        if (!operatorUrl) {
-            return res.status(400).send({ status: false, msg: "No URL configured for the event" });
-        }
-        const options = {
-            method: 'GET',
-            url: operatorUrl,
-            headers: {
-                'Content-Type': 'application/json',
-                token
-            }
-        };
-        try {
-            const response = await axios(options);
-            if (response.status === 200) {
-                return res.status(200).send(response.data);
-            } else {
-                console.log("Received an invalid response from upstream server");
-                return res.status(response.status).send({ status: false, msg: `Request failed from upstream server with response: ${JSON.stringify(response.data)}` });
-            }
-        } catch (err) {
-            console.error("Error during HTTP request:", err?.response?.data);
-            return res.status(500).send({ status: false, msg: "Internal Server error" });
-        }
+        validateUser = JSON.parse(await getRedis(token));
     } catch (err) {
-        console.error("Error getting user details:", err);
+        GET_USER_DETAIL.error('Error parsing Redis token', {
+            token,
+            error: err.message,
+            stack: err.stack
+        });
+        GET_USER_DETAIL.error(JSON.stringify({
+            req: {
+                headers: { token }
+            },
+            res: { msg: "Error parsing Redis token", ERROR: err }
+        }));
+        return res.status(400).send({ status: false, msg: "We've encountered an internal error" });
+    }
+
+    if (!validateUser) {
+        GET_USER_DETAIL.warn('Invalid token or session timed out', { token });
+        return res.status(401).send({ status: false, msg: "Invalid Token or session timed out" });
+    }
+
+    const { operatorId } = validateUser;
+    GET_USER_DETAIL.info('Validated user', { operatorId });
+
+    let operatorUrl;
+    try {
+        operatorUrl = await getWebhookUrl(operatorId, "USER_DETAILS");
+    } catch (err) {
+        GET_USER_DETAIL.error('Error getting webhook URL', {
+            operatorId,
+            error: err.message,
+            stack: err.stack
+        });
         return res.status(500).send({ status: false, msg: "Internal Server error" });
     }
-}
+
+    if (!operatorUrl) {
+        GET_USER_DETAIL.error('No URL configured for the event', { operatorId });
+        return res.status(400).send({ status: false, msg: "No URL configured for the event" });
+    }
+
+    GET_USER_DETAIL.info('Operator URL obtained', { operatorUrl });
+
+    const options = {
+        method: 'GET',
+        url: operatorUrl,
+        headers: {
+            'Content-Type': 'application/json',
+            token
+        }
+    };
+
+    try {
+        const response = await axios(options);
+        if (response.status === 200) {
+            GET_USER_DETAIL.info('Successfully fetched user details', { data: response.data });
+            return res.status(200).send(response.data);
+        } else {
+            GET_USER_DETAIL.warn('Invalid response from upstream server', { status: response.status, data: response.data });
+            return res.status(response.status).send({ status: false, msg: `Request failed from upstream server with response: ${JSON.stringify(response.data)}` });
+        }
+    } catch (err) {
+        GET_USER_DETAIL.error('Error during HTTP request', {
+            error: err.message,
+            response: err.response ? err.response.data : 'No response data',
+            stack: err.stack
+        });
+        return res.status(500).send({ status: false, msg: "Internal Server error" });
+    }
+};
 
 
 module.exports = { activeUser, logout, getUserDetail }

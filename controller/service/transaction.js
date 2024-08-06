@@ -4,14 +4,27 @@ const { read } = require("../../db_config/db");
 
 const getransaction = async (req, res) => {
     try {
-        let { limit = 100, offset = 0 } = req.query;
+        let { limit = 100, offset = 0  , user_id , operator_id} = req.query;
         limit = parseInt(limit);
         offset = parseInt(offset);
         if (isNaN(limit) || isNaN(offset)) {
             return res.status(400).send({ status: false, msg: "Invalid limit or offset" });
         }
-        const sql = `SELECT * FROM transaction limit ? offset ? `
-        const [data] = await read.query(sql, [limit, offset])
+        // const sql = `SELECT * FROM transaction limit ? offset ? `
+        // const [data] = await read.query(sql, [limit, offset])
+        let sql = `SELECT * FROM transaction`;
+        const params = [];
+        if (user_id) {
+            sql += ` WHERE user_id = ?`;
+            params.push(user_id);
+        }
+        if (user_id) {
+            sql += ` WHERE operator_id = ?`;
+            params.push(operator_id);
+        }
+        sql += ` ORDER BY id DESC LIMIT ? OFFSET ?`;
+        params.push(limit, offset);
+        const [data] = await read.query(sql,params)
         return res.status(200).send({ status: true, msg: "Find transaction", data })
     } catch (er) {
         console.error(er);

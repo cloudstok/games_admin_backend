@@ -8,7 +8,6 @@ const redis = new Redis({
     password: process.env.REDIS_PASSWORD || "",
 });
 
-
 redis.on('error', (err) => {
     console.error('Redis connection error:', err);
 });
