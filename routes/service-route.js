@@ -31,12 +31,9 @@ serviceRouter.post('/user/login/:id', userLogin);
 serviceRouter.get('/operator/user/balance', getUserBalance);//
 serviceRouter.post('/operator/user/balance', updateUserBalance);
 serviceRouter.get('/user/detail', getUserDetail);
-
 // bets 
 serviceRouter.get('/bets', bets)
-
-serviceRouter.get('/transaction/detail', getransaction);
-
+serviceRouter.get('/transaction/detail',auth(['admin']) ,getransaction);
 // webhook
 serviceRouter.post('/webhook', add_webhook);
 serviceRouter.get('/webhook', get_webhook);

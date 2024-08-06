@@ -26,6 +26,7 @@ async function verifyToken(req, res, next) {
 
 
 auth = (auth) => async (req, res, next) => {
+  
   try {
     const tokenHeader = req.headers.authorization;
     if (!tokenHeader)
@@ -35,7 +36,7 @@ auth = (auth) => async (req, res, next) => {
     if (!verifiedToken) {
       return res.status(401).json({ status : false , "message": "invalid token" })
     }
-    if (auth.includes(verifiedToken.user.role)) {
+    if (auth.includes(verifiedToken.user.user_type)) {
       res.locals.auth = verifiedToken;
       next()
     } else {
