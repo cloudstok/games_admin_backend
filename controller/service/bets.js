@@ -69,7 +69,7 @@ const processEvent = async ({ event, transaction, operatorUrl, secret, amount, d
     const [getRollbackTransaction] = await write.query(`SELECT * FROM transaction WHERE txn_id = ?`, [txn_ref_id]);
     const txn_id = await generateUUIDv7();
     const settleAmount = event === 'cashout' ? amount : getRollbackTransaction[0].amount;
-    const settleDescription = event === 'cashout' ? description : `${amount} Rollback-ed for transaction with reference ID ${txn_ref_id}`;
+    const settleDescription = event === 'cashout' ? description : `${settleAmount} Rollback-ed for transaction with reference ID ${txn_ref_id}`;
     const txn_type = event === 'cashout' ? 1 : 2;
     const webhookData = { txn_id, amount: settleAmount, txn_ref_id, description: settleDescription, txn_type, token: options.headers.token };
     const requestOptions = createOptions(operatorUrl, webhookData);
