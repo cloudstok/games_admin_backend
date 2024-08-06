@@ -12,7 +12,8 @@ const QUEUES = {
     debit: 'debit_queue',
     cashout: 'cashout_queue',
     rollback: 'rollback_queue',
-    failed: 'failed_queue'
+    failed: 'failed_queue',
+    errored: 'errored_queue'
 };
 const { AMQP_CONNECTION_STRING } = process.env;
 
@@ -81,6 +82,12 @@ async function handleMessage(queue, msg) {
     if (queue === QUEUES.failed) {
         await sendNotificationToGame(queue, dbData);
         console.error(`Message permanently failed in ${queue}: ${JSON.stringify(message)}`);
+        subChannel.ack(msg);
+        return;
+    }
+
+    if (queue === QUEUES.errored) {
+        console.error(`Message encountered an error in ${queue}: ${JSON.stringify(message)}`);
         subChannel.ack(msg);
         return;
     }
@@ -183,6 +190,12 @@ async function handleRetryOrMoveToNextQueue(currentQueue, message, originalMsg, 
     if (currentQueue === QUEUES.rollback && retries === 0) {
         const txn_id = await generateUUIDv7();
         const [getRollbackTransaction] = await write.query(`SELECT * FROM transaction WHERE txn_id = ?`, [dbData.txn_ref_id]);
+        if (!getRollbackTransaction || getRollbackTransaction.length === 0) {
+            console.error(`Rollback transaction not found for txn_ref_id: ${dbData.txn_ref_id}`);
+            await sendToQueue('', QUEUES.errored, JSON.stringify(message), 0, retries);
+            subChannel.ack(originalMsg);
+            return;
+        }
         let rollbackData = {
             txn_id, amount: getRollbackTransaction[0].amount, txn_ref_id: dbData.txn_ref_id, description: `${getRollbackTransaction[0].amount} Rollback-ed for transaction with reference ID ${dbData.txn_ref_id}`, txn_type: 2
         }

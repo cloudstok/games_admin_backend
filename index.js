@@ -27,12 +27,14 @@ async function initializeQueues() {
             debit: 'debit_queue',
             cashout: 'cashout_queue',
             rollback: 'rollback_queue',
-            failed: 'failed_queue'
+            failed: 'failed_queue',
+            errored: 'errored_queue'
         };
         consumeQueue(Queues.debit, handleMessage);
         consumeQueue(Queues.cashout, handleMessage);
         consumeQueue(Queues.rollback, handleMessage);
         consumeQueue(Queues.failed, handleMessage);
+        consumeQueue(Queues.errored, handleMessage);
 
         console.log('RabbitMQ queues are being consumed');
     } catch (error) {
