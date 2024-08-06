@@ -2,8 +2,10 @@ const express = require('express');
 const cors = require('cors');
 const { operatorRouter } = require('./routes/operator-route');
 const { serviceRouter } = require('./routes/service-route');
-const { deleteRedis } = require('./redis/connection');
+// const { deleteRedis } = require('./redis/connection');
 const { consumeQueue, connect, handleMessage } = require('./utilities/amqp');
+const createLogger = require('./utilities/logger');
+const logger = createLogger('Server');
 const app = express();
 
 require('dotenv').config();
@@ -15,7 +17,7 @@ app.use('/operator', operatorRouter);
 app.use('/service', serviceRouter);
 // (async ()=> deleteRedis('users'))();
 app.listen(PORT, () => {
-    console.log(`Server listening at PORT ${PORT}`);
+    logger.info(`Server listening at PORT ${PORT}`);
     initializeQueues();
 });
 
@@ -36,8 +38,8 @@ async function initializeQueues() {
         consumeQueue(Queues.failed, handleMessage);
         consumeQueue(Queues.errored, handleMessage);
 
-        console.log('RabbitMQ queues are being consumed');
+        logger.info('RabbitMQ queues are being consumed');
     } catch (error) {
-        console.error('Failed to initialize queues:', error);
+        logger.error('Failed to initialize queues:', error);
     }
 }

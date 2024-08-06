@@ -3,6 +3,12 @@ const axios = require('axios');
 const { write } = require("../db_config/db");
 const { generateUUIDv7 } = require("./common_function");
 const { encryption } = require("./ecryption-decryption");
+const createLogger = require('../utilities/logger');
+const thirdPartyLogger = createLogger('Third_Party_Data', 'jsonl');
+const failedThirdPartyLogger = createLogger('Failed_Third_Party_Data', 'jsonl');
+const gameNotificationLogger = createLogger('Game_Notification', 'jsonl');
+const failedGameNotificationLogger = createLogger('Failed_Game_Notification', 'jsonl');
+const rabbitMQLogger = createLogger('Queue');
 
 let pubChannel, subChannel = null;
 let connected = false;
@@ -21,18 +27,18 @@ const { AMQP_CONNECTION_STRING } = process.env;
 async function connect() {
     if (connected && pubChannel && subChannel) return;
     try {
-        console.info("⌛️ Connecting to Rabbit-MQ Server", AMQP_CONNECTION_STRING.split('@')[1]);
+        rabbitMQLogger.info("⌛️ Connecting to Rabbit-MQ Server", AMQP_CONNECTION_STRING.split('@')[1]);
         const connection = await client.connect(AMQP_CONNECTION_STRING);
-        console.info("✅ Rabbit MQ Connection is ready");
+        rabbitMQLogger.info("✅ Rabbit MQ Connection is ready");
         [pubChannel, subChannel] = await Promise.all([
             connection.createChannel(),
             connection.createChannel()
         ]);
-        console.info("🛸 Created RabbitMQ Channel successfully");
+        rabbitMQLogger.info("🛸 Created RabbitMQ Channel successfully");
         connected = true;
     } catch (error) {
-        console.error(error);
-        console.error("Not connected to MQ Server");
+        rabbitMQLogger.error(error);
+        rabbitMQLogger.error("Not connected to MQ Server");
     }
 }
 
@@ -44,9 +50,9 @@ async function sendToQueue(exchange, queueName, message, delay = 0, retries = 0)
         pubChannel.publish(exchange, queueName, Buffer.from(message), {
             headers: { "x-delay": delay, "x-retries": retries }, persistent: true
         });
-        console.log(`Message sent to ${queueName} queue on exchange ${exchange}`);
+        rabbitMQLogger.info(`Message sent to ${queueName} queue on exchange ${exchange}`);
     } catch (error) {
-        console.error(`Failed to send message to ${queueName} queue on exchange ${exchange}: ${error.message}`);
+        rabbitMQLogger.error(`Failed to send message to ${queueName} queue on exchange ${exchange}: ${error.message}`);
         throw error;
     }
 }
@@ -55,7 +61,7 @@ async function consumeQueue(queue, handler) {
     try {
         if (!subChannel) await connect();
         await subChannel.assertQueue(queue, { durable: true });
-        console.debug(`Creating consumer for ${queue}`);
+        rabbitMQLogger.info(`Creating consumer for ${queue}`);
 
         await subChannel.consume(queue, async (msg) => {
             if (!msg) return console.error("Invalid incoming message");
@@ -63,18 +69,20 @@ async function consumeQueue(queue, handler) {
             try {
                 await handler(queue, msg);
             } catch (error) {
-                console.error(`Handler error for ${queue}: ${error.message}`);
+                rabbitMQLogger.error(`Handler error for ${queue}: ${error.message}`);
                 subChannel.nack(msg);
             }
         }, { noAck: false });
     } catch (error) {
-        console.error(`Queue processing error: ${error.message}`);
+        rabbitMQLogger.error(`Queue processing error: ${error.message}`);
         throw error;
     }
 }
 
 async function handleMessage(queue, msg) {
+    let logId = await generateUUIDv7()
     const message = JSON.parse(msg.content.toString());
+    let logDataReq = {logId, message};
     let retries = msg.properties.headers['x-retries'] || 0;
     let dbData = message.db_data;
     delete message.db_data;
@@ -95,12 +103,14 @@ async function handleMessage(queue, msg) {
     try {
         const response = await axios(message);
         if (response?.status === 200) {
+            thirdPartyLogger.info(JSON.stringify({ req: logDataReq, res: response?.data}));
             console.log(`Request succeeded for ${queue}:`, response.data);
             if (queue === QUEUES.rollback) await sendNotificationToGame(queue, dbData);
             await executeSuccessQueries(queue, dbData);
             subChannel.ack(msg);
         } else {
             console.error(`Request failed for ${queue}: ${response.status}`);
+            failedThirdPartyLogger.error(JSON.stringify({ req: logDataReq, res: response?.data}));
             const insertId = await handleFailure(queue, dbData, message, retries);
             if (insertId) {
                 dbData.transaction_id = insertId
@@ -108,6 +118,8 @@ async function handleMessage(queue, msg) {
             await handleRetryOrMoveToNextQueue(queue, message, msg, retries, dbData);
         }
     } catch (error) {
+        let response = error.response ? error.response.data : err;
+        failedThirdPartyLogger.error(JSON.stringify({ req: logDataReq, res: response}));
         console.error(`Request failed for ${queue}: ${error.message}`);
         const insertId = await handleFailure(queue, dbData, message, retries);
         if (insertId) {
@@ -118,6 +130,7 @@ async function handleMessage(queue, msg) {
 }
 
 async function sendNotificationToGame(queue, data) {
+    let logId = await generateUUIDv7();
     let { operatorId, userId, amount, game_id, debit_description, socket_id, bet_id, txn_type, token } = data;
     const [[{ backend_base_url }]] = await write.query(`SELECT backend_base_url FROM games_master_list where game_id = ?`, [game_id]);
     let postData = {
@@ -137,14 +150,19 @@ async function sendNotificationToGame(queue, data) {
         },
         data: postData
     };
+    let logDataReq = {logId, options};
     try {
         const data = await axios(options);
         if (data.status === 200) {
+            gameNotificationLogger.info(JSON.stringify({ req: logDataReq, res: data?.data}));
             console.log(`[SUCCESS] Response from game for ${queue} event is:::`, JSON.stringify(data.data));
         } else {
+            failedGameNotificationLogger.error(JSON.stringify({ req: logDataReq, res: data?.data}));
             console.log(`[Error] Response from game for ${queue} event is:::`, JSON.stringify(data.data));
         }
     } catch (err) {
+        let response = error.response ? error.response.data : err;
+        failedGameNotificationLogger.error(JSON.stringify({ req: logDataReq, res: response}));
         console.error(`[Error] Response from game for ${queue} event is:::`, JSON.stringify(err?.response?.data));
     }
 }

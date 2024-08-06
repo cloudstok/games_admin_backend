@@ -2,53 +2,48 @@ const axios = require('axios');
 const { getRedis } = require('../../redis/connection');
 const { encryption } = require('../../utilities/ecryption-decryption');
 const { write } = require('../../db_config/db');
-const { getWebhookUrl } = require('../../utilities/common_function');
+const { getWebhookUrl, generateUUIDv7 } = require('../../utilities/common_function');
 const { sendToQueue } = require('../../utilities/amqp');
 const getLogger = require('../../utilities/logger');
-const logger = getLogger('UPDATE_USER_BALANCE', 'jsonl');
+const userBalanceLogger = getLogger('Get_User_Balance', 'jsonl');
+const failedUserBalanceLogger = getLogger('Failed_Get_User_Balance', 'jsonl');
+const updateBalanceLogger = getLogger('User_Update_Balance', 'jsonl');
+const failedUpdateBalanceLogger = getLogger('Failed_User_Update_Balance', 'jsonl');
 
 const getUserBalance = async (req, res) => {
+    const logId = await generateUUIDv7();
     const token = req.headers.token;
-    logger.info('Received request to get user balance', { token });
+    let logDataReq = {logId, token};
+    userBalanceLogger.info(JSON.stringify(logDataReq));
 
     let validateUser;
     try {
         validateUser = JSON.parse(await getRedis(token));
     } catch (err) {
-        logger.error('Error parsing Redis token', {
-            token,
-            error: err.message,
-            stack: err.stack
-        });
+        failedUserBalanceLogger.error(JSON.stringify({ req: logDataReq, res: 'Error parsing Redis token'}));
         return res.status(400).send({ status: false, msg: "We've encountered an internal error" });
     }
 
     if (!validateUser) {
-        logger.warn('Invalid token or session timed out', { token });
+        failedUserBalanceLogger.error(JSON.stringify({ req: logDataReq, res: 'Invalid token or session timed out'}));
         return res.status(401).send({ status: false, msg: "Invalid Token or session timed out" });
     }
 
     const { operatorId } = validateUser;
-    logger.info('Validated user', { operatorId });
 
     let operatorUrl;
     try {
         operatorUrl = await getWebhookUrl(operatorId, "GET_BALANCE");
     } catch (err) {
-        logger.error('Error getting webhook URL', {
-            operatorId,
-            error: err.message,
-            stack: err.stack
-        });
+        failedUserBalanceLogger.error(JSON.stringify({ req: logDataReq, res: 'Error while fetching webhook URL'}));
         return res.status(500).send({ status: false, msg: "Internal Server error" });
     }
 
     if (!operatorUrl) {
-        logger.error('No URL configured for the event', { operatorId });
+        failedUserBalanceLogger.error(JSON.stringify({ req: logDataReq, res: 'No URL configured for the event'}));
         return res.status(400).send({ status: false, msg: "No URL configured for the event" });
     }
 
-    logger.info('Operator URL obtained', { operatorUrl });
 
     const options = {
         method: 'GET',
@@ -62,18 +57,15 @@ const getUserBalance = async (req, res) => {
     try {
         const response = await axios(options);
         if (response.status === 200) {
-            logger.info('Successfully fetched user balance', { data: response.data });
+            userBalanceLogger.info(JSON.stringify({req: logDataReq, res: response?.data}));
             return res.status(200).send(response.data);
         } else {
-            logger.warn('Invalid response from upstream server', { status: response.status, data: response.data });
+            failedUserBalanceLogger.error(JSON.stringify({ req: logDataReq, res: response?.data}));
             return res.status(response.status).send({ status: false, msg: `Request failed from upstream server with response: ${JSON.stringify(response.data)}` });
         }
     } catch (error) {
-        logger.error('Error during HTTP request', {
-            error: error.message,
-            response: error.response ? error.response.data : 'No response data',
-            stack: error.stack
-        });
+        let response =  error.response ? error.response.data : err;
+        failedUserBalanceLogger.error(JSON.stringify({ req: logDataReq, res: response}));
         return res.status(500).send({ status: false, msg: "Internal Server error" });
     }
 };
@@ -81,59 +73,46 @@ const getUserBalance = async (req, res) => {
 
 
 const updateUserBalance = async (req, res) => {
+    const logId = await generateUUIDv7();
     const token = req.headers.token;
     const { txn_id, amount, txn_ref_id, description, txn_type, ip, game_id, socket_id, bet_id } = req.body;
-
-    logger.info('Received request to update user balance', { token, txn_id, amount, txn_type });
+    let logDataReq = {logId, token, body: req.body};
+    updateBalanceLogger.info(JSON.stringify(logDataReq));
 
     let validateUser;
     try {
         validateUser = JSON.parse(await getRedis(token));
     } catch (err) {
-        logger.error('Error parsing Redis token', {
-            token,
-            error: err.message,
-            stack: err.stack
-        });
+        failedUpdateBalanceLogger.error(JSON.stringify({ req: logDataReq, res: 'Error parsing Redis token'}));
         return res.status(400).send({ status: false, msg: "We've encountered an internal error" });
     }
 
     if (!validateUser) {
-        logger.warn('Invalid token or session timed out', { token });
+        failedUpdateBalanceLogger.error(JSON.stringify({ req: logDataReq, res: 'Invalid token or session timed out'}));
         return res.status(401).send({ status: false, msg: "Invalid Token or session timed out" });
     }
 
     const { operatorId, secret, userId } = validateUser;
-    logger.info('Validated user', { operatorId, userId });
 
     let operatorUrl;
     try {
         operatorUrl = await getWebhookUrl(operatorId, "UPDATE_BALANCE");
     } catch (err) {
-        logger.error('Error getting webhook URL', {
-            operatorId,
-            error: err.message,
-            stack: err.stack
-        });
+        failedUpdateBalanceLogger.error(JSON.stringify({ req: logDataReq, res: 'Error while fetching webhook URL'}));
         return res.status(500).send({ status: false, msg: "Internal Server error" });
     }
 
     if (!operatorUrl) {
-        logger.error('No URL configured for the event', { operatorId });
+        failedUpdateBalanceLogger.error(JSON.stringify({ req: logDataReq, res: 'No URL configured for the event'}));
         return res.status(400).send({ status: false, msg: "No URL configured for the event" });
     }
 
-    logger.info('Operator URL obtained', { operatorUrl });
 
     let encryptedData;
     try {
         encryptedData = await encryption({ amount, txn_id, description, txn_type, txn_ref_id, ip, game_id }, secret);
     } catch (err) {
-        logger.error('Error encrypting data', {
-            data: { amount, txn_id, description, txn_type, txn_ref_id, ip, game_id },
-            error: err.message,
-            stack: err.stack
-        });
+        failedUpdateBalanceLogger.error(JSON.stringify({ req: logDataReq, res: 'Error while encrypting data'}));
         return res.status(500).send({ status: false, msg: "Internal Server error" });
     }
 
@@ -151,18 +130,12 @@ const updateUserBalance = async (req, res) => {
     const optionsWithRetry = { ...options, db_data };
     let queue = txn_type === 0 ? 'debit_queue' : 'cashout_queue';
 
-    logger.info('Sending data to queue', { queue, optionsWithRetry });
-
     try {
         await sendToQueue('', queue, JSON.stringify(optionsWithRetry), 1000);
-        logger.info('Successfully sent to queue', { queue, optionsWithRetry });
+        updateBalanceLogger.info(JSON.stringify({req: logDataReq, res: 'Balance updated successfully'}));
         return res.status(200).send({ status: true, msg: "Balance updated successfully" });
     } catch (err) {
-        logger.error('Error sending to queue', {
-            queue,
-            error: err.message,
-            stack: err.stack
-        });
+        failedUpdateBalanceLogger.error(JSON.stringify({ req: logDataReq, res: 'Error sending to queue'}));
         return res.status(500).send({ status: false, msg: "Internal Server error" });
     }
 };

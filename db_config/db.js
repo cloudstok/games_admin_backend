@@ -1,4 +1,6 @@
 const {createPool} = require('mysql2/promise');
+const createLogger = require('../utilities/logger');
+const logger = createLogger('Database');
 require('dotenv').config();
 const dbConfig = {
     host: process.env.DB_HOST,
@@ -10,9 +12,9 @@ const dbConfig = {
 read = createPool(dbConfig);
 write = createPool(dbConfig);
 
-// (async ()=>{
-//    console.log("DATABASE CONNECTION SUCCESSFUL")
-// })()
+(async ()=>{
+   logger.info("DATABASE CONNECTION SUCCESSFUL")
+})()
 
 
 module.exports = {read , write}
