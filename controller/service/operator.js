@@ -12,15 +12,13 @@ const login = async (req, res) => {
   try {
     const { userId, password } = req.body
     const [data] = await read.query("SELECT id, user_id, password, pub_key, secret, user_type  FROM operator where user_id = ?", [userId])
-
     if (data.length > 0) {
       const checkPassword = await compare(password, data[0].password)
-
       if (!checkPassword) {
         return res.status(401).json({ status: false, msg: "Missing or Incorrect Credentials" });
       }
       const token = await generateToken(data[0], res)
-      return res.status(200).send({ status: true, msg: "Operator logged in..", token })
+      return res.status(200).send({ status: true, msg: "Operator logged in..", token ,role : data[0].user_type })
     } else {
       return res.status(404).json({ status: false, msg: "Operator does not exists" })
     }
@@ -123,10 +121,6 @@ const userLogin = async (req, res) => {
     if (getOperator.length > 0) {
       let { user_id, pub_key, secret, url } = getOperator[0];
       const decodeData = await decryption(data, secret);
-      // let timeDifference = (Date.now() - decodeData.reqTime) / 1000;
-      // if (timeDifference > 5) {
-      //   return res.status(400).send({ status: false, msg: "Request timed out" });
-      // }
       const token = await generateUUIDv7();
       let user = await getRedis('users')
       if (user) {
