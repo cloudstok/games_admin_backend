@@ -75,7 +75,7 @@ const getUserBalance = async (req, res) => {
 const updateUserBalance = async (req, res) => {
     const logId = await generateUUIDv7();
     const token = req.headers.token;
-    const { txn_id, amount, txn_ref_id, description, txn_type, ip, game_id, socket_id, bet_id } = req.body;
+    const { txn_id, amount, txn_ref_id, description, txn_type, ip, game_id, socket_id, bet_id, user_id } = req.body;
     let logDataReq = {logId, token, body: req.body};
     updateBalanceLogger.info(JSON.stringify(logDataReq));
 
@@ -110,7 +110,7 @@ const updateUserBalance = async (req, res) => {
 
     let encryptedData;
     try {
-        encryptedData = await encryption({ amount, txn_id, description, txn_type, txn_ref_id, ip, game_id }, secret);
+        encryptedData = await encryption({ amount, txn_id, description, txn_type, txn_ref_id, ip, game_id, user_id }, secret);
     } catch (err) {
         failedUpdateBalanceLogger.error(JSON.stringify({ req: logDataReq, res: 'Error while encrypting data'}));
         return res.status(500).send({ status: false, msg: "Internal Server error" });

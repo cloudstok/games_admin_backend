@@ -34,6 +34,10 @@ async function connect() {
             connection.createChannel(),
             connection.createChannel()
         ]);
+        pubChannel.on('close',async ()=>{ console.error("pubChannel Closed") ;  pubChannel = null; });
+        subChannel.on('close',async ()=>{ console.error("subChannel Closed") ;  subChannel = null; });
+        pubChannel.on('error',async (msg)=>{ console.error("pubChannel Error" , msg); });
+        subChannel.on('error',async (msg)=>{ console.error("subChannel Error" , msg); });
         rabbitMQLogger.info("🛸 Created RabbitMQ Channel successfully");
         connected = true;
     } catch (error) {
@@ -47,6 +51,7 @@ async function sendToQueue(exchange, queueName, message, delay = 0, retries = 0)
         if (!pubChannel) {
             await connect();
         }
+        await pubChannel.assertQueue(queueName, { durable: true });
         pubChannel.publish(exchange, queueName, Buffer.from(message), {
             headers: { "x-delay": delay, "x-retries": retries }, persistent: true
         });
@@ -64,7 +69,7 @@ async function consumeQueue(queue, handler) {
         rabbitMQLogger.info(`Creating consumer for ${queue}`);
 
         await subChannel.consume(queue, async (msg) => {
-            if (!msg) return console.error("Invalid incoming message");
+            if (!msg) return console.error("Invalid incoming message for queue ",queue);
 
             try {
                 await handler(queue, msg);
