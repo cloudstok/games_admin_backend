@@ -61,8 +61,33 @@ const get_webhook = async (req, res) => {
 }
 
 
+
+const update_webhook_url = async (req, res) => {
+    try {
+        const { id, url } = req.body;
+        if (!id || !url) {
+            return res.status(400).send({ status: false, msg: "ID and URL are required" });
+        }
+
+        const sql = "UPDATE webhook_config SET webhook_url = ? WHERE id = ?";
+        const result = await write.query(sql, [url, id]);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).send({ status: false, msg: "Webhook configuration not found" });
+        }
+
+        return res.status(200).send({ status: true, msg: "Webhook URL updated successfully" });
+    } catch (err) {
+        console.error("Error updating webhook URL:", err);
+        return res.status(500).send({ status: false, msg: "Internal Server Error" });
+    }
+}
+
+
+
 module.exports = {
     add_webhook,
     get_webhook,
-    webhook
+    webhook,
+    update_webhook_url
 }

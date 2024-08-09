@@ -7,7 +7,7 @@ const { verifyToken } = require('../utilities/jwt/jsonwebtoken');
 const { activeUser, getUserDetail } = require('../controller/service/user');
 const { getransaction, rollbacklist } = require('../controller/service/transaction');
 const serviceRouter = require('express').Router();
-const { add_webhook, get_webhook, webhook } = require('../controller/service/webhook');
+const { add_webhook, get_webhook, webhook, update_webhook_url } = require('../controller/service/webhook');
 const { bets, manualCashoutOrRollback, operatorRollback } = require('../controller/service/bets');
 
 
@@ -38,7 +38,7 @@ serviceRouter.get('/transaction/detail',auth(['admin']) ,getransaction);
 serviceRouter.post('/webhook', add_webhook);
 serviceRouter.get('/webhook', get_webhook);
 serviceRouter.get('/webhook/:user_id', webhook);
-
+serviceRouter.put('/webhook' , update_webhook_url)
 
 
 //rollback list
