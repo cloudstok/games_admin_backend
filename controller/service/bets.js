@@ -7,20 +7,38 @@ const { getRedis } = require('../../redis/connection');
 // Get Bets from Game
 const bets = async (req, res) => {
     try {
-        const { limit, offset } = req.query
-        const data = await fetchBetsData(limit, offset);
-        return res.status(200).send({ status: true, msg: "Games Fetched successfully", data })
+        const { limit = 10, offset = 0 } = req.query
+        const data = await fetchAllBets(limit, offset);
+        return res.status(200).send({ status: true, msg: "Games settlement successfully", data : data.data })
     } catch (er) {
         console.error(er);
         return res.status(500).send({ status: false, msg: "internal server Error", er })
     }
 }
+async function fetchAllBets(limit, offset) {
+    const url = 'http://localhost:5000/all/bets';
+    const params = {
+        limit,
+        offset
+    };
+    try {
+        const response = await axios.get(url , {params});
+        return response.data;
+    } catch (error) {
+        handleRequestError(error);
+    }
+}
 
-const fetchBetsData = async (limit, offset) => {
-    const url = `${process.env.bets_base_url}?limit=${limit}&offset=${offset}`;
-    const response = await axios.get(url);
-    return response?.data?.data;
-};
+function handleRequestError(error) {
+    if (error.response) {
+        console.error(`Request failed with status ${error.response.status}: ${error.response.data}`);
+    } else if (error.request) {
+        console.error('No response received from server:', error.request);
+    } else {
+        console.error('Error in request setup:', error.message);
+    }
+    throw new Error('Failed to fetch bets');
+}
 
 
 //Admin Rollback or Cashout Retry
