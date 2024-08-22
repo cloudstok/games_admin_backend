@@ -123,7 +123,7 @@ async function handleMessage(queue, msg) {
             await handleRetryOrMoveToNextQueue(queue, message, msg, retries, dbData);
         }
     } catch (error) {
-        let response = error.response ? error.response.data : err;
+        let response = error.response ? error.response.data : error;
         failedThirdPartyLogger.error(JSON.stringify({ req: logDataReq, res: response}));
         console.error(`Request failed for ${queue}: ${error.message}`);
         const insertId = await handleFailure(queue, dbData, message, retries);
@@ -165,10 +165,10 @@ async function sendNotificationToGame(queue, data) {
             failedGameNotificationLogger.error(JSON.stringify({ req: logDataReq, res: data?.data}));
             console.log(`[Error] Response from game for ${queue} event is:::`, JSON.stringify(data.data));
         }
-    } catch (err) {
-        let response = error.response ? error.response.data : err;
+    } catch (error) {
+        let response = error.response ? error.response.data : error;
         failedGameNotificationLogger.error(JSON.stringify({ req: logDataReq, res: response}));
-        console.error(`[Error] Response from game for ${queue} event is:::`, JSON.stringify(err?.response?.data));
+        console.error(`[Error] Response from game for ${queue} event is:::`, JSON.stringify(error?.response?.data));
     }
 }
 
