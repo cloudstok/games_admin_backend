@@ -7,21 +7,21 @@ const { logout } = require('../controller/service/user');
 const { changePassword, OperatorchangePassword } = require('../controller/service/operator');
 const { rollbackCredit } = require('../controller/operator/bets');
 const operatorRouter = require('express').Router();
-operatorRouter.post('/create/user', verifyToken, addUser);
+operatorRouter.post('/create/user', auth(['admin' , 'operator']) , verifyToken, addUser);
 operatorRouter.post('/user/login', userLogin)
-operatorRouter.post('/game', serviceAddGame)
-operatorRouter.post('/wallet', addWallet)
-operatorRouter.get('/wallet/:user_id', findWallet)
-operatorRouter.get('/wallet', AllWallet)
+operatorRouter.post('/game', auth(['admin' , 'operator']) , serviceAddGame)
+operatorRouter.post('/wallet', auth(['admin' , 'operator']) , addWallet)
+operatorRouter.get('/wallet/:user_id', auth(['admin' , 'operator']), findWallet)
+operatorRouter.get('/wallet', auth(['admin' , 'operator']) , AllWallet)
 operatorRouter.get('/user/balance', userBalance);
 operatorRouter.post('/user/balance', updateBalance);
 operatorRouter.get('/games/list', operatorFindGame);
-operatorRouter.get('/user/list', getUser);
+operatorRouter.get('/user/list', auth(['admin' , 'operator']) ,  getUser);
 operatorRouter.get('/user/logout', logout);
 operatorRouter.get('/user/detail', getuserDetail);
-operatorRouter.get('/game/detail', getGeame);
-operatorRouter.post('/user/change/password', changePassword); // user change Password
-operatorRouter.post('/change/password', verifyToken , OperatorchangePassword);  // operator change Password
-operatorRouter.post('/transaction/rollback', rollbackCredit);
+operatorRouter.get('/game/detail',auth(['admin' , 'operator']), getGeame);
+operatorRouter.post('/user/change/password', auth(['admin' , 'operator']) , changePassword); // user change Password
+operatorRouter.post('/change/password', verifyToken , auth(['admin' , 'operator']) , OperatorchangePassword);  // operator change Password
+operatorRouter.post('/transaction/rollback',auth(['admin' , 'operator']) , rollbackCredit);
 
 module.exports = { operatorRouter };

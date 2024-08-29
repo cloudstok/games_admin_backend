@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken')
 async function generateToken(storeData, res) {
   try {
-    const Token = await jwt.sign({ user: storeData }, process.env.jwtSecretKey, {expiresIn: '5h'});
+    const Token = await jwt.sign({ user: storeData }, process.env.jwtSecretKey, {expiresIn: '1h'});
     return Token
   } catch (err) {
     console.error(er);

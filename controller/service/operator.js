@@ -18,7 +18,7 @@ const login = async (req, res) => {
         return res.status(401).json({ status: false, msg: "Missing or Incorrect Credentials" });
       }
       const token = await generateToken(data[0], res)
-      return res.status(200).send({ status: true, msg: "Operator logged in..", token ,role : data[0].user_type })
+      return res.status(200).send({ status: true, msg: "Operator logged in..", token , expiresIn : '1H' , role : data[0].user_type })
     } else {
       return res.status(404).json({ status: false, msg: "Operator does not exists" })
     }
