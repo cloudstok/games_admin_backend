@@ -16,9 +16,9 @@ const bets = async (req, res) => {
     }
 }
 async function fetchAllBets(data) {
-    const url = 'http://localhost:5000/all/bets';
     const params = data
-    
+    const url = process.env.STATS_BASE_URL + `/${params.game}/all/bets`;
+    delete params.game;
     try {
         const response = await axios.get(url , {params});
         return response.data;
