@@ -1,10 +1,8 @@
 const { read } = require("../../db_config/db");
 
-
-
 const getransaction = async (req, res) => {
     try {
-        let { limit = 100, offset = 0, user_id, operator_id } = req.query;
+        let { limit = 100, offset = 0, user_id, operator_id , game_id } = req.query;
         limit = parseInt(limit);
         offset = parseInt(offset);
         if (isNaN(limit) || isNaN(offset)) {
@@ -17,6 +15,10 @@ const getransaction = async (req, res) => {
         if (user_id) {
             whereConditions.push('user_id = ?');
             params.push(user_id);
+        }
+        if (game_id) {
+            whereConditions.push('game_id = ?');
+            params.push(game_id);
         }
         if (operator_id) {
             whereConditions.push('operator_id = ?');
