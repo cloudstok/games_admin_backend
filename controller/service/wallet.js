@@ -5,6 +5,7 @@ const { write } = require('../../db_config/db');
 const { getWebhookUrl, generateUUIDv7 } = require('../../utilities/common_function');
 const { sendToQueue } = require('../../utilities/amqp');
 const getLogger = require('../../utilities/logger');
+const { variableConfig } = require('../../utilities/load-config');
 const userBalanceLogger = getLogger('Get_User_Balance', 'jsonl');
 const failedUserBalanceLogger = getLogger('Failed_Get_User_Balance', 'jsonl');
 const updateBalanceLogger = getLogger('User_Update_Balance', 'jsonl');
@@ -76,6 +77,7 @@ const updateUserBalance = async (req, res) => {
     const logId = await generateUUIDv7();
     const token = req.headers.token;
     const { txn_id, amount, txn_ref_id, description, txn_type, ip, game_id, socket_id, bet_id, user_id } = req.body;
+    const game_code = (variableConfig.games_masters_list.find(e=> e.game_id == game_id))?.game_code;
     let logDataReq = {logId, token, body: req.body};
     updateBalanceLogger.info(JSON.stringify(logDataReq));
 
@@ -110,7 +112,7 @@ const updateUserBalance = async (req, res) => {
 
     let encryptedData;
     try {
-        encryptedData = await encryption({ amount, txn_id, description, txn_type, txn_ref_id, ip, game_id, user_id }, secret);
+        encryptedData = await encryption({ amount, txn_id, description, txn_type, txn_ref_id, ip, game_id, user_id, game_code }, secret);
     } catch (err) {
         failedUpdateBalanceLogger.error(JSON.stringify({ req: logDataReq, res: 'Error while encrypting data'}));
         return res.status(500).send({ status: false, msg: "Internal Server error" });

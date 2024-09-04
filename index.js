@@ -5,6 +5,7 @@ const { serviceRouter } = require('./routes/service-route');
 // const { deleteRedis } = require('./redis/connection');
 const { consumeQueue, connect, handleMessage } = require('./utilities/amqp');
 const createLogger = require('./utilities/logger');
+const { loadConfig } = require('./utilities/load-config');
 const logger = createLogger('Server');
 const app = express();
 
@@ -20,6 +21,7 @@ app.listen(PORT, () => {
     logger.info(`Server listening at PORT ${PORT}`);
     initializeQueues();
 });
+(async()=> await loadConfig())();
 
 async function initializeQueues() {
     try {

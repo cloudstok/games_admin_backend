@@ -144,3 +144,6 @@ create table pending_transactions(
     created_at timestamp default current_timestamp,
     updated_at timestamp on update current_timestamp
 );
+
+
+ALTER TABLE `games_admin`.`games_master_list` ADD COLUMN `company_name` VARCHAR(60) NULL AFTER `image`, ADD COLUMN `game_code` VARCHAR(60) NULL AFTER `company_name`;
