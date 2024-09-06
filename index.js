@@ -29,6 +29,7 @@ const initializeServer = async () => {
         });
     } catch (error) {
         logger.error('Error during server initialization:', error);
+        process.exit(1);
     }
 };
 
@@ -51,6 +52,7 @@ async function initializeQueues() {
         logger.info('RabbitMQ queues are being consumed');
     } catch (error) {
         logger.error('Failed to initialize queues:', error);
+        process.exit(1); 
     }
 }
 
