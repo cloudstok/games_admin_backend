@@ -9,6 +9,7 @@ const getransaction = async (req, res) => {
             return res.status(400).send({ status: false, msg: "Invalid limit or offset" });
         }
         let sql = 'SELECT * FROM transaction';
+        const count = 'SELECT count(id) as total FROM transaction';
         const params = [];
         let whereConditions = [];
 
@@ -32,8 +33,15 @@ const getransaction = async (req, res) => {
         sql += ' ORDER BY id DESC LIMIT ? OFFSET ?';
         params.push(limit, offset);
 
-        const [data] = await read(sql, params);
-        return res.status(200).send({ status: true, msg: "Find transaction", data });
+        // Use Promise.all to execute both queries in parallel
+        const [dataResult, totalResult] = await Promise.all([
+            read(sql, params),              // Fetch the transactions
+            read(count, [])                 // Fetch the count of total transactions
+        ]);
+
+        const [data] = dataResult;
+        const [[{ total }]] = totalResult;
+        return res.status(200).send({ status: true, msg: "Find transaction", total ,data });
     } catch (err) {
         console.error('Error:', err);
         res.status(500).send({ status: false, msg: 'Internal Server Error' });

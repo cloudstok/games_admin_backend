@@ -9,7 +9,7 @@ const bets = async (req, res) => {
     try {
         // const { limit = 10, offset = 0 } = req.query
         const data = await fetchAllBets(req.query);
-        return res.status(200).send({ status: true, msg: "Games settlement successfully", data : data.data })
+        return res.status(200).send({ status: true, msg: "data found", total : data.total , data : data.data  })
     } catch (er) {
         console.error(er);
         return res.status(500).send({ status: false, msg: "internal server Error", er })
