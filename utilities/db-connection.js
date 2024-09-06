@@ -51,7 +51,7 @@ const executeQuery = async (pool, query, params = []) => {
         try {
             const connection = await pool.getConnection();
             try {
-                const results = await connection.execute(query, params);
+                const results = await connection.query(query, params);
                 connection.release();
                 return results;
             } finally {
