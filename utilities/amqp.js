@@ -1,6 +1,6 @@
 const client = require("amqplib");
 const axios = require('axios');
-const { write } = require("../db_config/db");
+const { write } = require("./db-connection");
 const { generateUUIDv7 } = require("./common_function");
 const { encryption } = require("./ecryption-decryption");
 const createLogger = require('../utilities/logger');
@@ -137,7 +137,7 @@ async function handleMessage(queue, msg) {
 async function sendNotificationToGame(queue, data) {
     let logId = await generateUUIDv7();
     let { operatorId, userId, amount, game_id, debit_description, socket_id, bet_id, txn_type, token } = data;
-    const [[{ backend_base_url }]] = await write.query(`SELECT backend_base_url FROM games_master_list where game_id = ?`, [game_id]);
+    const [[{ backend_base_url }]] = await write(`SELECT backend_base_url FROM games_master_list where game_id = ?`, [game_id]);
     let postData = {
         userId, operatorId, txn_type, bet_id, socket_id, token
     }
@@ -175,11 +175,11 @@ async function sendNotificationToGame(queue, data) {
 
 async function executeSuccessQueries(queue, responseData) {
     const { userId, token, operatorId, txn_id, amount, txn_ref_id, description, txn_type, game_id, transaction_id } = responseData;
-    await write.query("INSERT IGNORE INTO transaction (user_id, game_id , session_token , operator_id, txn_id, amount,  txn_ref_id , description, txn_type, txn_status) VALUES (?)", [[userId, game_id, token, operatorId, txn_id, amount, txn_ref_id, description, `${txn_type}`, '2']]);
+    await write("INSERT IGNORE INTO transaction (user_id, game_id , session_token , operator_id, txn_id, amount,  txn_ref_id , description, txn_type, txn_status) VALUES (?)", [[userId, game_id, token, operatorId, txn_id, amount, txn_ref_id, description, `${txn_type}`, '2']]);
     console.log(`Successful ${queue} transaction logged to db`);
     if (queue === QUEUES.rollback) {
-        const updateTransaction = write.query(`UPDATE transaction SET txn_status = "0" WHERE txn_ref_id = ? and txn_type = '1'`, [txn_ref_id]);
-        const updatePendingTransaction = write.query(`UPDATE pending_transaction SET event = 'rollback', txn_status = '0' WHERE transaction_id = ?`, [transaction_id]);
+        const updateTransaction = write(`UPDATE transaction SET txn_status = "0" WHERE txn_ref_id = ? and txn_type = '1'`, [txn_ref_id]);
+        const updatePendingTransaction = write(`UPDATE pending_transaction SET event = 'rollback', txn_status = '0' WHERE transaction_id = ?`, [transaction_id]);
         await Promise.all([updateTransaction, updatePendingTransaction]);
     }
 }
@@ -198,10 +198,10 @@ async function executeCashoutFailureQueries(data, message) {
     const { userId, token, operatorId, txn_id, amount, txn_ref_id, description, txn_type, game_id } = data;
     if(data.txn_type === 0){
         console.log('As Cashout queue is failed and transaction type is DEBIT retry is not permittted, inserting failed debit transaction');
-        await write.query("INSERT IGNORE INTO transaction (user_id,game_id, session_token , operator_id, txn_id, amount,  txn_ref_id , description, txn_type, txn_status) VALUES (?)", [[userId, game_id, token, operatorId, txn_id, amount, txn_ref_id, description, `${txn_type}`, '0']]);
+        await write("INSERT IGNORE INTO transaction (user_id,game_id, session_token , operator_id, txn_id, amount,  txn_ref_id , description, txn_type, txn_status) VALUES (?)", [[userId, game_id, token, operatorId, txn_id, amount, txn_ref_id, description, `${txn_type}`, '0']]);
     }else{
-        const [{ insertId }] = await write.query("INSERT IGNORE INTO transaction (user_id,game_id, session_token , operator_id, txn_id, amount,  txn_ref_id , description, txn_type, txn_status) VALUES (?)", [[userId, game_id, token, operatorId, txn_id, amount, txn_ref_id, description, `${txn_type}`, '1']]);
-        await write.query("INSERT IGNORE INTO pending_transactions (transaction_id, game_id, options) VALUES (?)", [[insertId, game_id, JSON.stringify(message)]]);
+        const [{ insertId }] = await write("INSERT IGNORE INTO transaction (user_id,game_id, session_token , operator_id, txn_id, amount,  txn_ref_id , description, txn_type, txn_status) VALUES (?)", [[userId, game_id, token, operatorId, txn_id, amount, txn_ref_id, description, `${txn_type}`, '1']]);
+        await write("INSERT IGNORE INTO pending_transactions (transaction_id, game_id, options) VALUES (?)", [[insertId, game_id, JSON.stringify(message)]]);
         console.log('As Cashout queue is failed, inserting pending transaction for further future manual rollback or cashout retry');
         return insertId;
     }
@@ -212,7 +212,7 @@ async function handleRetryOrMoveToNextQueue(currentQueue, message, originalMsg, 
 
     if (currentQueue === QUEUES.rollback && retries === 0) {
         const txn_id = await generateUUIDv7();
-        const [getRollbackTransaction] = await write.query(`SELECT * FROM transaction WHERE txn_id = ?`, [dbData.txn_ref_id]);
+        const [getRollbackTransaction] = await write(`SELECT * FROM transaction WHERE txn_id = ?`, [dbData.txn_ref_id]);
         if (!getRollbackTransaction || getRollbackTransaction.length === 0) {
             console.error(`Rollback transaction not found for txn_ref_id: ${dbData.txn_ref_id}`);
             await sendToQueue('', QUEUES.errored, JSON.stringify(message), 0, retries);
@@ -222,7 +222,7 @@ async function handleRetryOrMoveToNextQueue(currentQueue, message, originalMsg, 
         let rollbackData = {
             txn_id, amount: getRollbackTransaction[0].amount, txn_ref_id: dbData.txn_ref_id, description: `${getRollbackTransaction[0].amount} Rollback-ed for transaction with reference ID ${dbData.txn_ref_id}`, txn_type: 2
         }
-        const [operator] = await write.query(`SELECT * FROM operator where user_id = ?`, [dbData.operatorId]);
+        const [operator] = await write(`SELECT * FROM operator where user_id = ?`, [dbData.operatorId]);
         message.data.data = await encryption(rollbackData, operator[0].secret);
         dbData.debit_description = getRollbackTransaction[0].description
         for (const key in rollbackData) {

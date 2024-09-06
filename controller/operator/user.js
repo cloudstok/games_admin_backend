@@ -1,10 +1,10 @@
-const { read, write } = require("../../db_config/db");
+const { read, write } = require("../../utilities/db-connection");
 const axios = require('axios');
 const { generateRandomUserId, generateRandomString } = require("../../utilities/common_function");
-const { hashPassword, compare } = require("../../utilities/bcrypt/bcrypt");
+const { hashPassword, compare } = require("../../utilities/bcrypt");
 const { encryption, decryption } = require('../../utilities/ecryption-decryption');
 const jwt = require('jsonwebtoken');
-const { getRedis } = require("../../redis/connection");
+const { getRedis } = require("../../utilities/redis-connection");
 
 
 //Register User
@@ -36,7 +36,7 @@ const generateUserIdAndPassword = async (name) => {
 
 const insertUserIntoDatabase = async (id, name, userId, hashedPassword, currency_preference) => {
     const sql = "INSERT IGNORE INTO user (operator_id, name, user_id, password, currency_prefrence) VALUES (?, ?, ?, ?, ?)";
-    await write.query(sql, [id, name, userId, hashedPassword, currency_preference]);
+    await write(sql, [id, name, userId, hashedPassword, currency_preference]);
 };
 
 
@@ -75,12 +75,12 @@ const userLogin = async (req, res) => {
 }
 
 const getOperatorCredentials = async () => {
-    const [operator] = await write.query(`SELECT pub_key, secret FROM operator WHERE user_type = 'operator' AND is_deleted = 0 LIMIT 1`);
+    const [operator] = await write(`SELECT pub_key, secret FROM operator WHERE user_type = 'operator' AND is_deleted = 0 LIMIT 1`);
     return operator[0];
 };
 
 const getUserDetails = async (userId) => {
-    const [user] = await write.query(`SELECT * FROM user WHERE user_id = ?`, [userId]);
+    const [user] = await write(`SELECT * FROM user WHERE user_id = ?`, [userId]);
     return user[0];
 };
 
@@ -150,7 +150,7 @@ const verifyToken = (token) => {
 
 const fetchUserData = async (operatorId, limit, offset) => {
     const sql = `SELECT * FROM user WHERE operator_id = ? AND is_deleted = 0 LIMIT ? OFFSET ?`;
-    const [data] = await read.query(sql, [operatorId, limit, offset]);
+    const [data] = await read(sql, [operatorId, limit, offset]);
     return data;
 };
 
@@ -200,7 +200,7 @@ const fetchUserDetailsFromDatabase = async (userId) => {
         INNER JOIN user_wallet AS w ON u.user_id = w.user_id 
         WHERE u.user_id = ?
     `;
-    const [[user]] = await read.query(sql, [userId]);
+    const [[user]] = await read(sql, [userId]);
     return user;
 };
 

@@ -1,7 +1,7 @@
 
 const { default: axios } = require("axios");
-const { read, write } = require("../../db_config/db");
-const { getRedis } = require("../../redis/connection");
+const { read, write } = require("../../utilities/db-connection");
+const { getRedis } = require("../../utilities/redis-connection");
 
 
 const addGame = async (req, res) => {
@@ -15,7 +15,7 @@ const addGame = async (req, res) => {
             return res.status(400).send({ status: false, msg: "Name and URL are required" });
         }
         const sql = `INSERT IGNORE INTO games_master_list (name, url) VALUES (?, ?)`;
-        await write.query(sql, [name, url]);
+        await write(sql, [name, url]);
         return res.status(200).send({ status: true, msg: "Game added successfully to master's list" });
     } catch (err) {
         return res.status(500).json({ status: false, msg: "Internal server error", error: err.message });
@@ -38,7 +38,7 @@ const findGame = async (req, res) => {
         }
         const { operatorId } = validateUser;
         const sql = `SELECT * FROM operator_games AS op RIGHT JOIN games_master_list AS gml ON gml.game_id = op.game_id WHERE operator_id = ?`;
-        const [data] = await write.query(sql, [operatorId]);
+        const [data] = await write(sql, [operatorId]);
         return res.status(200).send({ status: true, data });
     } catch (err) {
         return res.status(500).json({ msg: "Internal server Error", status: false });
@@ -75,7 +75,7 @@ const operatorFindGame = async (req, res) => {
 const getGeame = async (req, res) => {
     try {
         const { url } = req.body
-        const [[data]] = await read.query("select * from games_master_list where redirect_url = ?", [url])
+        const [[data]] = await read("select * from games_master_list where redirect_url = ?", [url])
         return res.status(200).send({ status: true, data })
     } catch (er) {
         console.log(er)

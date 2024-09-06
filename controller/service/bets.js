@@ -1,8 +1,8 @@
 const axios = require('axios');
-const { write } = require('../../db_config/db');
+const { write } = require('../../utilities/db-connection');
 const { getWebhookUrl, createOptions, generateUUIDv7 } = require('../../utilities/common_function');
 const { encryption, decryption } = require('../../utilities/ecryption-decryption');
-const { getRedis } = require('../../redis/connection');
+const { getRedis } = require('../../utilities/redis-connection');
 
 // Get Bets from Game
 const bets = async (req, res) => {
@@ -43,7 +43,7 @@ function handleRequestError(error) {
 const manualCashoutOrRollback = async (req, res) => {
     try {
         const { id, event, operator_id, description, amount, txn_ref_id, user_id, session_token, backend_base_url, game_id } = req.body;
-        const [getTransaction] = await write.query(`SELECT * FROM pending_transactions where id = ? and txn_status = '1'`, [id]);
+        const [getTransaction] = await write(`SELECT * FROM pending_transactions where id = ? and txn_status = '1'`, [id]);
         if (getTransaction.length === 0) {
             return res.status(400).send({ status: false, msg: "No pending history found for the transaction id" });
         }
@@ -54,7 +54,7 @@ const manualCashoutOrRollback = async (req, res) => {
         if (isRetryLimitExceeded(event, transaction)) {
             return res.status(400).send({ status: false, msg: `Maximum ${event} retries exceeded` });
         }
-        const [operator] = await write.query(`SELECT * FROM operator where user_id = ?`, [operator_id]);
+        const [operator] = await write(`SELECT * FROM operator where user_id = ?`, [operator_id]);
         if (operator.length === 0) {
             return res.status(400).send({ status: false, msg: "Invalid Operator Requested or operator does not exist" });
         }
@@ -82,7 +82,7 @@ const isRetryLimitExceeded = (event, transaction) => {
 const processEvent = async ({ event, transaction, operatorUrl, secret, amount, description, txn_ref_id, user_id, session_token, backend_base_url, operator_id, id, game_id, res }) => {
     let { options, cashout_retries, rollback_retries, transaction_id } = transaction;
     event === 'cashout' ? cashout_retries += 1 : rollback_retries += 1;
-    const [getRollbackTransaction] = await write.query(`SELECT * FROM transaction WHERE txn_id = ?`, [txn_ref_id]);
+    const [getRollbackTransaction] = await write(`SELECT * FROM transaction WHERE txn_id = ?`, [txn_ref_id]);
     const txn_id = await generateUUIDv7();
     const settleAmount = event === 'cashout' ? amount : getRollbackTransaction[0].amount;
     const settleDescription = event === 'cashout' ? description : `${settleAmount} Rollback-ed for transaction with reference ID ${txn_ref_id}`;
@@ -90,7 +90,7 @@ const processEvent = async ({ event, transaction, operatorUrl, secret, amount, d
     const webhookData = { txn_id, amount: settleAmount, txn_ref_id, description: settleDescription, txn_type, token: options.headers.token };
     const requestOptions = createOptions(operatorUrl, webhookData);
     requestOptions.data.data = await encryption(requestOptions.data.data, secret);
-    await write.query(`UPDATE pending_transactions SET cashout_retries = ?, rollback_retries = ? WHERE id = ?`, [cashout_retries, rollback_retries, id]);
+    await write(`UPDATE pending_transactions SET cashout_retries = ?, rollback_retries = ? WHERE id = ?`, [cashout_retries, rollback_retries, id]);
     try {
         const data = await axios(requestOptions);
         if (data.status === 200) {
@@ -249,7 +249,7 @@ const getValidatedUser = async (token) => {
 
 const getOperator = async (operatorId) => {
     try {
-        const [getOperator] = await write.query(`SELECT * FROM operator WHERE user_id = ?`, [operatorId]);
+        const [getOperator] = await write(`SELECT * FROM operator WHERE user_id = ?`, [operatorId]);
         return getOperator.length > 0 ? getOperator[0] : null;
     } catch (error) {
         console.error('Error fetching operator:', error);
@@ -259,7 +259,7 @@ const getOperator = async (operatorId) => {
 
 const getPendingTransaction = async (txn_ref_id) => {
     try {
-        const [getPendingTransaction] = await write.query(`SELECT gm.backend_base_url, tr.id, gm.game_id FROM transaction as tr inner join inner join games_master_list as gm on gm.game_id = tr.game_id WHERE tr.txn_ref_id = ? and tr.txn_type = '1' and tr.txn_status = '1'`, [txn_ref_id]);
+        const [getPendingTransaction] = await write(`SELECT gm.backend_base_url, tr.id, gm.game_id FROM transaction as tr inner join inner join games_master_list as gm on gm.game_id = tr.game_id WHERE tr.txn_ref_id = ? and tr.txn_type = '1' and tr.txn_status = '1'`, [txn_ref_id]);
         return getPendingTransaction;
     } catch (error) {
         console.error('Error fetching pending transaction:', error);
@@ -269,7 +269,7 @@ const getPendingTransaction = async (txn_ref_id) => {
 
 const getRollbackTransaction = async (txn_ref_id) => {
     try {
-        const [getRollbackTransaction] = await write.query(`SELECT * FROM transaction WHERE txn_id = ?`, [txn_ref_id]);
+        const [getRollbackTransaction] = await write(`SELECT * FROM transaction WHERE txn_id = ?`, [txn_ref_id]);
         return getRollbackTransaction;
     } catch (error) {
         console.error('Error fetching rollback transaction:', error);

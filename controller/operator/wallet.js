@@ -1,6 +1,6 @@
 
-const { read, write } = require("../../db_config/db");
-const { getRedis } = require("../../redis/connection");
+const {write } = require("../../utilities/db-connection");
+const { getRedis } = require("../../utilities/redis-connection");
 const { decryption } = require("../../utilities/ecryption-decryption");
 
 const addWallet = async (req, res) => {
@@ -37,7 +37,7 @@ const findWallet = async (req, res) => {
         if (!user_id) {
             return res.status(400).json({ status: false, msg: "User ID is required" });
         }
-        const [data] = await write.query("SELECT * FROM user_wallet WHERE user_id = ?", [user_id]);
+        const [data] = await write("SELECT * FROM user_wallet WHERE user_id = ?", [user_id]);
         if (!data || data.length === 0) {
             return res.status(404).json({ status: false, msg: "Wallet not found" });
         }
@@ -57,7 +57,7 @@ const AllWallet = async (req, res) => {
         if (isNaN(limit) || isNaN(offset)) {
             return res.status(400).send({ status: false, msg: "Invalid limit or offset" });
         }
-        const [data] = await write.query("SELECT * FROM user INNER JOIN user_wallet ON user.user_id = user_wallet.user_id LIMIT ? OFFSET ?", [limit, offset]);
+        const [data] = await write("SELECT * FROM user INNER JOIN user_wallet ON user.user_id = user_wallet.user_id LIMIT ? OFFSET ?", [limit, offset]);
         return res.status(200).json({ status: true, data });
     } catch (err) {
         console.error(err);
@@ -70,13 +70,13 @@ const userBalance = async (req, res) => {
     try {
         const { data } = req.body;
         const operatorUrl = 'http://' + req.headers.host;
-        const [getOperator] = await write.query(`SELECT secret FROM operator WHERE url = ?`, [operatorUrl]);
+        const [getOperator] = await write(`SELECT secret FROM operator WHERE url = ?`, [operatorUrl]);
         if (getOperator.length === 0) {
             return res.status(400).send({ status: false, msg: "Invalid Operator requested" });
         }
         const { secret } = getOperator[0];
         const { userId } = await decryption(data, secret);
-        const [getUserWallet] = await write.query(`SELECT balance FROM user_wallet WHERE user_id = ?`, [userId]);
+        const [getUserWallet] = await write(`SELECT balance FROM user_wallet WHERE user_id = ?`, [userId]);
         if (getUserWallet.length === 0) {
             return res.status(400).send({ status: false, msg: "User wallet does not exist" });
         }
@@ -100,7 +100,7 @@ const updateBalance = async (req, res) => {
             return res.status(400).send({ status: false, msg: "We've encountered an internal error" });
         }
         const { operatorId, userId } = validateUser;
-        const [getOperator] = await write.query("SELECT secret FROM operator WHERE user_id = ?", [operatorId]);
+        const [getOperator] = await write("SELECT secret FROM operator WHERE user_id = ?", [operatorId]);
         if (getOperator.length === 0) {
             return res.status(400).send({ status: false, msg: "Invalid Operator requested" });
         }
@@ -112,7 +112,7 @@ const updateBalance = async (req, res) => {
         } else {
             query = `UPDATE user_wallet SET balance = balance - ? WHERE user_id = ?`;
         }
-        const [updateUserBalance] = await write.query(query, [amount, userId]);
+        const [updateUserBalance] = await write(query, [amount, userId]);
         if (updateUserBalance.affectedRows !== 0) {
             return res.status(200).send({ status: true, msg: "User balance updated successfully" });
         } else {

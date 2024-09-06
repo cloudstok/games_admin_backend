@@ -1,6 +1,6 @@
 const { serviceAddGame } = require('../controller/service/game');
 const { addUser, userLogin, getUser, getuserDetail } = require('../controller/operator/user');
-const { verifyToken } = require('../utilities/jwt/jsonwebtoken');
+const { verifyToken } = require('../utilities/jsonwebtoken');
 const { addWallet, findWallet, userBalance, updateBalance, AllWallet } = require('../controller/operator/wallet');
 const { operatorFindGame, getGeame } = require('../controller/operator/game');
 const { logout } = require('../controller/service/user');

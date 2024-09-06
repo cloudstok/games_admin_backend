@@ -1,4 +1,4 @@
-const { getRedis,  setRedis } = require("../../redis/connection");
+const { getRedis,  setRedis } = require("../../utilities/redis-connection");
 const { getWebhookUrl, generateUUIDv7 } = require("../../utilities/common_function");
 const axios = require('axios');
 const getLogger = require('../../utilities/logger');

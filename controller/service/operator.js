@@ -1,17 +1,17 @@
 
-const { compare, hashPassword } = require('../../utilities/bcrypt/bcrypt')
-const { read, write } = require('../../db_config/db')
-const { generateToken } = require('../../utilities/jwt/jsonwebtoken')
+const { compare, hashPassword } = require('../../utilities/bcrypt')
+const { read, write } = require('../../utilities/db-connection')
+const { generateToken } = require('../../utilities/jsonwebtoken')
 const { generateRandomString, generateRandomUserId, generateUUID, generateUUIDv7 } = require('../../utilities/common_function')
 const { decryption } = require('../../utilities/ecryption-decryption')
-const { setRedis, getRedis, deleteRedis } = require('../../redis/connection')
+const { setRedis, getRedis, deleteRedis } = require('../../utilities/redis-connection')
 
 
 // Operator login API
 const login = async (req, res) => {
   try {
     const { userId, password } = req.body
-    const [data] = await read.query("SELECT id, user_id, password, pub_key, secret, user_type  FROM operator where user_id = ?", [userId])
+    const [data] = await read("SELECT id, user_id, password, pub_key, secret, user_type  FROM operator where user_id = ?", [userId])
     if (data.length > 0) {
       const checkPassword = await compare(password, data[0].password)
       if (!checkPassword) {
@@ -37,14 +37,14 @@ const OperatorchangePassword = async (req, res) => {
     if (newPassword !== confirmPassword) {
       return res.status(200).send({ status: true, msg: `your ${newPassword} is not match your ${confirmPassword}` })
     }
-    const [getUser] = await write.query(`SELECT * FROM operator WHERE user_id = ?`, [user_id]);
+    const [getUser] = await write(`SELECT * FROM operator WHERE user_id = ?`, [user_id]);
     if (getUser.length > 0) {
       const checkPassword = await compare(currentPassword, getUser[0].password)
       if (!checkPassword) {
         return res.status(401).json({ status: false, msg: "Missing or Incorrect Credentials" });
       } else {
         const hashedPassword = await hashPassword(newPassword);
-        await read.query("update operator set password = ? where user_id = ?", [hashedPassword, user_id])
+        await read("update operator set password = ? where user_id = ?", [hashedPassword, user_id])
         return res.status(200).send({ status: true, msg: "change password successfully" })
       }
     } else {
@@ -61,7 +61,7 @@ const register = async (req, res) => {
   try {
     if (req.operator?.user?.user_type === 'admin') {
       const { name, user_type, url } = req.body;
-      const [data] = await read.query("SELECT * FROM operator where name = ?", [name]);
+      const [data] = await read("SELECT * FROM operator where name = ?", [name]);
       if (data.length > 0) {
         return res.status(200).send({ status: false, msg: "Operator already registered with this name" });
       } else {
@@ -77,7 +77,7 @@ const register = async (req, res) => {
         const [password, secret_key, pub_key] = parts;
         const hashedPassword = await hashPassword(password);
         let userType = user_type ? user_type : 'operator';
-        await write.query("INSERT  IGNORE INTO operator (name, user_id, password, pub_key, secret, user_type , url) VALUES (?,?,?,?,?, ? , ?)", [name, userId, hashedPassword, pub_key, secret_key, userType, url]);
+        await write("INSERT  IGNORE INTO operator (name, user_id, password, pub_key, secret, user_type , url) VALUES (?,?,?,?,?, ? , ?)", [name, userId, hashedPassword, pub_key, secret_key, userType, url]);
         return res.status(200).send({ status: true, msg: "Operator registered successfully", data: { name, userId, password, pub_key, secret_key, user_type, url } });
       }
     } else {
@@ -99,7 +99,7 @@ const getOperatorList = async (req, res) => {
     }
 
     if (req.operator?.user?.user_type === 'admin') {
-      const [operatorList] = await write.query(`SELECT  * FROM operator where user_type = 'operator' and is_deleted = 0 limit ? offset ?`, [+limit, +offset]);
+      const [operatorList] = await write(`SELECT  * FROM operator where user_type = 'operator' and is_deleted = 0 limit ? offset ?`, [+limit, +offset]);
       return res.status(200).send({ status: true, msg: "Operators list fetched successfully", data: operatorList });
     } else {
       return res.status(401).send({ status: false, msg: "User not authorized to perform the operation" });
@@ -117,7 +117,7 @@ const userLogin = async (req, res) => {
   try {
     let { id } = req.params;
     let { data } = req.body;
-    const [getOperator] = await write.query(`SELECT * FROM operator WHERE pub_key = ?`, [id]);
+    const [getOperator] = await write(`SELECT * FROM operator WHERE pub_key = ?`, [id]);
     if (getOperator.length > 0) {
       let { user_id, pub_key, secret, url } = getOperator[0];
       const decodeData = await decryption(data, secret);
@@ -154,14 +154,14 @@ const changePassword = async (req, res) => {
       return res.status(200).send({ status: true, msg: `your ${newPassword} is not match your ${confirmPassword}` })
     }
     const { userId } = JSON.parse(await getRedis(token))
-    const [getUser] = await write.query(`SELECT * FROM user WHERE user_id = ?`, [userId]);
+    const [getUser] = await write(`SELECT * FROM user WHERE user_id = ?`, [userId]);
     if (getUser.length > 0) {
       const checkPassword = await compare(currentPassword, getUser[0].password)
       if (!checkPassword) {
         return res.status(401).json({ status: false, msg: "Missing or Incorrect Credentials" });
       } else {
         const hashedPassword = await hashPassword(newPassword);
-        await read.query("update user set password = ? where user_id = ?", [hashedPassword, userId])
+        await read("update user set password = ? where user_id = ?", [hashedPassword, userId])
         return res.status(200).send({ status: true, msg: "change password successfully" })
       }
     } else {

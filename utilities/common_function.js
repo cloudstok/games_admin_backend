@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const {write} = require('../db_config/db');
+const {write} = require('./db-connection');
 async function generateRandomString(length) {
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     let randomString = "";
@@ -63,7 +63,7 @@ async function generateUUIDv7() {
 
 const getWebhookUrl = async(user_id, event_name) => {
     try{
-        const [getWebhookUrl] = await write.query(`SELECT webhook_url FROM webhook_config where user_id = ? and event = ?`, [user_id, event_name]);
+        const [getWebhookUrl] = await write(`SELECT webhook_url FROM webhook_config where user_id = ? and event = ?`, [user_id, event_name]);
         return getWebhookUrl[0].webhook_url;
     }catch(err){
         return false;

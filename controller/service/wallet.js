@@ -1,7 +1,7 @@
 const axios = require('axios');
-const { getRedis } = require('../../redis/connection');
+const { getRedis } = require('../../utilities/redis-connection');
 const { encryption } = require('../../utilities/ecryption-decryption');
-const { write, read } = require('../../db_config/db');
+const { write, read } = require('../../utilities/db-connection');
 const { getWebhookUrl, generateUUIDv7 } = require('../../utilities/common_function');
 const { sendToQueue } = require('../../utilities/amqp');
 const getLogger = require('../../utilities/logger');

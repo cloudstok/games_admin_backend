@@ -1,6 +1,6 @@
 const { default: axios } = require("axios");
-const { read, write } = require("../../db_config/db");
-const { getRedis } = require("../../redis/connection");
+const { read, write } = require("../../utilities/db-connection");
+const { getRedis } = require("../../utilities/redis-connection");
 
 
 const getOperatorGame = async (req, res) => {
@@ -18,7 +18,7 @@ const getOperatorGame = async (req, res) => {
         }
         const { operatorId } = validateUser;
         const sql = ` SELECT *  FROM operator_games AS og  INNER JOIN games_master_list AS gml  ON gml.game_id = og.game_id  WHERE operator_id = ? `;
-        const [gamesList] = await write.query(sql, [operatorId]);
+        const [gamesList] = await write(sql, [operatorId]);
         return res.status(200).send({ status: true, msg: "Games fetched successfully for operator", data: gamesList });
     } catch (err) {
         console.error("Error fetching operator games:", err);
@@ -35,7 +35,7 @@ const getOperatorGamesForService = async (req, res) => {
         }
         const { operator_id } = req.params;
         const sql = `SELECT * FROM operator_games AS og INNER JOIN games_master_list AS gml ON gml.game_id = og.game_id WHERE operator_id = ? `;
-        const [gamesList] = await write.query(sql, [operator_id]);
+        const [gamesList] = await write(sql, [operator_id]);
         return res.status(200).send({ status: true, msg: "Games fetched successfully for operator", data: gamesList });
     } catch (err) {
         console.error("Error fetching operator games:", err);
@@ -51,7 +51,7 @@ const addGameForOperator = async (req, res) => {
         }
         const { operator_id, game_id } = req.body;
         const sql = `INSERT IGNORE INTO operator_games (game_id, operator_id) VALUES (?, ?)`;
-        await write.query(sql, [game_id, operator_id]);
+        await write(sql, [game_id, operator_id]);
         return res.status(200).send({ status: true, msg: "Game assigned successfully to operator" });
     } catch (err) {
         console.error("Error assigning game to operator:", err);
@@ -67,7 +67,7 @@ const serviceAddGame = async (req, res) => {
         }
         const { name, url } = req.body;
         const sql = `INSERT IGNORE INTO games_master_list (name, url) VALUES (?, ?)`;
-        await write.query(sql, [name, url]);
+        await write(sql, [name, url]);
         return res.status(200).send({ status: true, msg: "Game added successfully to the master's list" });
     } catch (err) {
         console.error("Error adding game to master's list:", err);
@@ -88,7 +88,7 @@ const getMasterListGames = async (req, res) => {
             return res.status(401).send({ status: false, msg: "User not authorized to perform the operation" });
         }
         const sql = `SELECT * FROM games_master_list WHERE is_active = 1 LIMIT ? OFFSET ?`;
-        const [gamesList] = await write.query(sql, [limit, offset]);
+        const [gamesList] = await write(sql, [limit, offset]);
         return res.status(200).send({ status: true, msg: "Games list fetched successfully", gamesList });
     } catch (err) {
         console.error("Error fetching games list:", err);

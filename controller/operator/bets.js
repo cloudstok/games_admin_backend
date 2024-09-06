@@ -1,4 +1,4 @@
-const {write} = require('../../db_config/db');
+const {write} = require('../../utilities/db-connection');
 const { encryption, decryption } = require('../../utilities/ecryption-decryption');
 const axios = require('axios');
 
@@ -31,7 +31,7 @@ const rollbackCredit = async (req, res) => {
 };
 
 const getOperatorDetails = async () => {
-    const [operator] = await write.query(`SELECT * FROM operator WHERE user_type = 'operator' AND is_deleted = 0 LIMIT 1`);
+    const [operator] = await write(`SELECT * FROM operator WHERE user_type = 'operator' AND is_deleted = 0 LIMIT 1`);
     return operator.length > 0 ? operator[0] : null;
 };
 
