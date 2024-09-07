@@ -64,9 +64,9 @@ async function generateUUIDv7() {
 const getWebhookUrl = async(user_id, event_name) => {
     try{
         const [getWebhookUrl] = await write(`SELECT webhook_url FROM webhook_config where user_id = ? and event = ?`, [user_id, event_name]);
-        return getWebhookUrl[0].webhook_url;
+        return getWebhookUrl[0].webhook_url || false;
     }catch(err){
-        return false;
+        return err;
     }
 }
 
