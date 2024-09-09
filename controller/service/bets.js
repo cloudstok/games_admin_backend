@@ -7,25 +7,31 @@ const { getRedis } = require('../../utilities/redis-connection');
 // Get Bets from Game
 const bets = async (req, res) => {
     try {
-        // const { limit = 10, offset = 0 } = req.query
-        const data = await fetchAllBets(req.query);
+        const token = req.headers.authorization; 
+        const data = await fetchAllBets(req.query , token);
         return res.status(200).send({ status: true, msg: "data found", total : data.total , data : data.data  })
     } catch (er) {
         console.error(er);
         return res.status(500).send({ status: false, msg: "internal server Error", er })
     }
 }
-async function fetchAllBets(data) {
-    const params = data
+async function fetchAllBets(data, token) {
+    const params = { ...data };
     const url = process.env.STATS_BASE_URL + `/${params.game}/all/bets`;
     delete params.game;
     try {
-        const response = await axios.get(url , {params});
+        const response = await axios.get(url, {
+            params,
+            headers: {
+                Authorization: token // Include token in the headers
+            }
+        });
         return response.data;
     } catch (error) {
         handleRequestError(error);
     }
 }
+
 
 function handleRequestError(error) {
     if (error.response) {
