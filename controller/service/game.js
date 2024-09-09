@@ -1,6 +1,7 @@
 const { default: axios } = require("axios");
 const { read, write } = require("../../utilities/db-connection");
 const { getRedis } = require("../../utilities/redis-connection");
+const { loadConfig } = require("../../utilities/load-config");
 
 
 const getOperatorGame = async (req, res) => {
@@ -66,8 +67,9 @@ const serviceAddGame = async (req, res) => {
             return res.status(401).send({ status: false, msg: "User not authorized to perform the operation" });
         }
         const { name, url , backendurl } = req.body;
-        const sql = `INSERT IGNORE INTO games_master_list (name, url , backend_base_url) VALUES (?, ? , ?)`;
+        const sql = `INSERT IGNORE INTO games_master_list (name, url , backend_base_url, company_name, game_code) VALUES (?,?,?,?,?)`;
         await write(sql, [name, url , backendurl]);
+        await loadConfig({ loadGames: true});
         return res.status(200).send({ status: true, msg: "Game added successfully to the master's list" });
     } catch (err) {
         console.error("Error adding game to master's list:", err);
