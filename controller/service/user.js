@@ -100,4 +100,22 @@ const getUserDetail = async (req, res) => {
 };
 
 
-module.exports = { activeUser, logout, getUserDetail }
+const getuserDatatoredis = async (req, res) => {
+    try {
+      const { token } = req.headers;
+      if (!token) {
+        return res.status(400).send({ status: false, msg: "Token is missing" });
+      }
+      const userData = await getRedis(token);
+      if (!userData) {
+        return res.status(404).send({ status: false, msg: "User data not found" });
+      }
+      return res.status(200).send({ status: true, userData: JSON.parse(userData) });
+    } catch (error) {
+      console.error("Error fetching user data:", error);
+      return res.status(500).send({ status: false, msg: "Internal Server Error" });
+    }
+  };
+  
+
+module.exports = { activeUser, logout, getUserDetail , getuserDatatoredis }
