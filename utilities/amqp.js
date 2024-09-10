@@ -4,11 +4,13 @@ const { write } = require("./db-connection");
 const { generateUUIDv7 } = require("./common_function");
 const { encryption } = require("./ecryption-decryption");
 const createLogger = require('../utilities/logger');
+const { variableConfig } = require("./load-config");
 const thirdPartyLogger = createLogger('Third_Party_Data', 'jsonl');
 const failedThirdPartyLogger = createLogger('Failed_Third_Party_Data', 'jsonl');
 const gameNotificationLogger = createLogger('Game_Notification', 'jsonl');
 const failedGameNotificationLogger = createLogger('Failed_Game_Notification', 'jsonl');
 const rabbitMQLogger = createLogger('Queue');
+const logger = createLogger('Consumer');
 
 let pubChannel, subChannel = null;
 let connected = false;
@@ -23,6 +25,21 @@ const QUEUES = {
 };
 const { AMQP_CONNECTION_STRING } = process.env;
 
+async function initQueue() {
+    await connect();
+    const Queues = {
+        debit: 'debit_queue',
+        cashout: 'cashout_queue',
+        rollback: 'rollback_queue',
+        failed: 'failed_queue',
+        errored: 'errored_queue'
+    };
+    
+    for (const [key, queue] of Object.entries(Queues)) {
+        await consumeQueue(queue, handleMessage);
+    }
+    logger.info('RabbitMQ queues are being consumed');
+}
 
 async function connect() {
     if (connected && pubChannel && subChannel) return;
@@ -34,10 +51,14 @@ async function connect() {
             connection.createChannel(),
             connection.createChannel()
         ]);
-        pubChannel.on('close',async ()=>{ console.error("pubChannel Closed") ;  pubChannel = null; });
-        subChannel.on('close',async ()=>{ console.error("subChannel Closed") ;  subChannel = null; });
+        pubChannel.removeAllListeners('close');
+        pubChannel.removeAllListeners('error');
+        subChannel.removeAllListeners('close');
+        subChannel.removeAllListeners('error');
+        pubChannel.on('close',async ()=>{ console.error("pubChannel Closed") ;  pubChannel = null; connected= false; });
+        subChannel.on('close',async ()=>{ console.error("subChannel Closed") ;  subChannel = null; connected= false; /*initQueue*/ });
         pubChannel.on('error',async (msg)=>{ console.error("pubChannel Error" , msg); });
-        subChannel.on('error',async (msg)=>{ console.error("subChannel Error" , msg); });
+        subChannel.on('error',async (msg)=>{ console.error("subChannel Error" , msg); initQueue() });
         rabbitMQLogger.info("🛸 Created RabbitMQ Channel successfully");
         connected = true;
     } catch (error) {
@@ -67,10 +88,8 @@ async function consumeQueue(queue, handler) {
         if (!subChannel) await connect();
         await subChannel.assertQueue(queue, { durable: true });
         rabbitMQLogger.info(`Creating consumer for ${queue}`);
-
         await subChannel.consume(queue, async (msg) => {
-            if (!msg) return console.error("Invalid incoming message for queue ",queue);
-
+            if (!msg) throw ({message:"Invalid incoming message for queue "});
             try {
                 await handler(queue, msg);
             } catch (error) {
@@ -137,7 +156,11 @@ async function handleMessage(queue, msg) {
 async function sendNotificationToGame(queue, data) {
     let logId = await generateUUIDv7();
     let { operatorId, userId, amount, game_id, debit_description, socket_id, bet_id, txn_type, token } = data;
-    const [[{ backend_base_url }]] = await write(`SELECT backend_base_url FROM games_master_list where game_id = ?`, [game_id]);
+    let backend_base_url = (variableConfig.games_masters_list.find(e=> e.game_id == game_id))?.backend_base_url || null;
+    if(!backend_base_url){
+        console.log(`[Error] Unable to get the Backend Base URL for the given game id`);
+        return;
+    }
     let postData = {
         userId, operatorId, txn_type, bet_id, socket_id, token
     }
@@ -222,8 +245,8 @@ async function handleRetryOrMoveToNextQueue(currentQueue, message, originalMsg, 
         let rollbackData = {
             txn_id, amount: getRollbackTransaction[0].amount, txn_ref_id: dbData.txn_ref_id, description: `${getRollbackTransaction[0].amount} Rollback-ed for transaction with reference ID ${dbData.txn_ref_id}`, txn_type: 2
         }
-        const [operator] = await write(`SELECT * FROM operator where user_id = ?`, [dbData.operatorId]);
-        message.data.data = await encryption(rollbackData, operator[0].secret);
+        const operator = (variableConfig.operator_data.find(e=> e.user_id === dbData.operatorId)) || null;
+        message.data.data = await encryption(rollbackData, operator.secret);
         dbData.debit_description = getRollbackTransaction[0].description
         for (const key in rollbackData) {
             if (rollbackData.hasOwnProperty(key)) {
@@ -269,8 +292,7 @@ async function handleRetryOrMoveToNextQueue(currentQueue, message, originalMsg, 
 }
 
 module.exports = {
+    initQueue,
     sendToQueue,
-    consumeQueue,
-    handleMessage,
     connect
 };

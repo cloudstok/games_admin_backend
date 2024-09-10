@@ -6,6 +6,14 @@ const redis = new Redis({
     host: process.env.REDIS_HOST || localhost,
     port: Number(process.env.REDIS_PORT) || 6379,
     password: process.env.REDIS_PASSWORD || "",
+    reconnectOnError(err) {
+        const targetError = "READONLY";
+        if (err.message.includes(targetError)) {
+          // Only reconnect when the error contains "READONLY"
+          //This feature is useful when using Amazon ElastiCache instances with Auto-failover disabled.
+          return true; // or `return 1;`
+        }
+      }
 });
 
 redis.on('error', (err) => {

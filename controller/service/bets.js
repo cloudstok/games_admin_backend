@@ -3,12 +3,12 @@ const { write } = require('../../utilities/db-connection');
 const { getWebhookUrl, createOptions, generateUUIDv7 } = require('../../utilities/common_function');
 const { encryption, decryption } = require('../../utilities/ecryption-decryption');
 const { getRedis } = require('../../utilities/redis-connection');
+const { variableConfig } = require('../../utilities/load-config');
 
 // Get Bets from Game
 const bets = async (req, res) => {
     try {
-        const token = req.headers.authorization; 
-        const data = await fetchAllBets(req.query , token);
+        const data = await fetchAllBets(req.query);
         return res.status(200).send({ status: true, msg: "data found", total : data.total , data : data.data  })
     } catch (er) {
         console.error(er);
@@ -60,11 +60,11 @@ const manualCashoutOrRollback = async (req, res) => {
         if (isRetryLimitExceeded(event, transaction)) {
             return res.status(400).send({ status: false, msg: `Maximum ${event} retries exceeded` });
         }
-        const [operator] = await write(`SELECT * FROM operator where user_id = ?`, [operator_id]);
-        if (operator.length === 0) {
+        const operator = (variableConfig.operator_data.find(e=> e.user_id === operator_id)) || null;
+        if (!operator) {
             return res.status(400).send({ status: false, msg: "Invalid Operator Requested or operator does not exist" });
         }
-        const secret = operator[0].secret;
+        const secret = operator.secret;
         const operatorUrl = await getWebhookUrl(operator_id, "UPDATE_BALANCE");
         if (!operatorUrl) {
             return res.status(400).send({ status: false, msg: "No URL configured for the event" });
@@ -255,8 +255,8 @@ const getValidatedUser = async (token) => {
 
 const getOperator = async (operatorId) => {
     try {
-        const [getOperator] = await write(`SELECT * FROM operator WHERE user_id = ?`, [operatorId]);
-        return getOperator.length > 0 ? getOperator[0] : null;
+        const getOperator = (variableConfig.operator_data.find(e=> e.user_id === operatorId)) || null;
+        return getOperator;
     } catch (error) {
         console.error('Error fetching operator:', error);
         throw new Error('Operator fetch failed');
