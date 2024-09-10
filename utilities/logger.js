@@ -57,7 +57,6 @@ function createLogger(moduleName, format = 'plain') {
     },
     base: { name: moduleName },
   }, pino.multistream([
-    { stream: prettyStream }, 
     { stream: logFileStream } 
   ]));
 }

@@ -1,4 +1,5 @@
 const { write } = require("../../utilities/db-connection");
+const { loadConfig, variableConfig } = require("../../utilities/load-config");
 
 const add_webhook = async (req, res) => {
     try {
@@ -8,6 +9,7 @@ const add_webhook = async (req, res) => {
         }
         const sql = "INSERT INTO webhook_config (user_id, webhook_url, event) VALUES (?, ?, ?)";
         await write(sql, [user_id, url, event]);
+        await loadConfig({ loadWebhook: true});
         return res.status(200).send({ status: true, msg: "Webhook configured successfully" });
     } catch (err) {
         console.error("Error configuring webhook:", err);
@@ -25,8 +27,7 @@ const webhook = async (req, res) => {
         if (!user_id) {
             return res.status(400).send({ status: false, msg: "User ID is required" });
         }
-        const sql = "SELECT * FROM webhook_config WHERE user_id = ?";
-        const [webhookDetails] = await write(sql, [user_id]);
+        const webhookDetails = variableConfig.webhook_data.filter(el=> el.user_id === user_id) || [];
         if (webhookDetails.length === 0) {
             return res.status(404).send({ status: false, msg: "No webhook configurations found for the user" });
         }
@@ -71,7 +72,7 @@ const update_webhook_url = async (req, res) => {
 
         const sql = "UPDATE webhook_config SET webhook_url = ? WHERE id = ?";
         const result = await write(sql, [url, id]);
-
+        await loadConfig({ loadWebhook: true});
         if (result.affectedRows === 0) {
             return res.status(404).send({ status: false, msg: "Webhook configuration not found" });
         }

@@ -79,11 +79,7 @@ const updateUserBalance = async (req, res) => {
     const { txn_id, amount, txn_ref_id, description, txn_type, ip, game_id, socket_id, bet_id, user_id } = req.body;
     let game_code = (variableConfig.games_masters_list.find(e=> e.game_id == game_id))?.game_code || null;
     if(!game_code){
-        await loadConfig();
-        game_code = (variableConfig.games_masters_list.find(e=> e.game_id == game_id))?.game_code || null;
-        if(!game_code){
-            return res.status(400).send({ status: false, msg: "No game code is available for the game"});
-        }
+        return res.status(400).send({ status: false, msg: "No game code is available for the game"});
     }
     let logDataReq = {logId, token, body: req.body};
     updateBalanceLogger.info(JSON.stringify(logDataReq));

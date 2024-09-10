@@ -5,20 +5,21 @@ const { generateToken } = require('../../utilities/jsonwebtoken')
 const { generateRandomString, generateRandomUserId, generateUUID, generateUUIDv7 } = require('../../utilities/common_function')
 const { decryption } = require('../../utilities/ecryption-decryption')
 const { setRedis, getRedis, deleteRedis } = require('../../utilities/redis-connection')
+const { variableConfig, loadConfig } = require('../../utilities/load-config')
 
 
 // Operator login API
 const login = async (req, res) => {
   try {
     const { userId, password } = req.body
-    const [data] = await read("SELECT id, user_id, password, pub_key, secret, user_type  FROM operator where user_id = ?", [userId])
-    if (data.length > 0) {
-      const checkPassword = await compare(password, data[0].password)
+    const data = variableConfig.operator_data.find(e=> e.user_id === userId) || null;
+    if (data) {
+      const checkPassword = await compare(password, data.password)
       if (!checkPassword) {
         return res.status(401).json({ status: false, msg: "Missing or Incorrect Credentials" });
       }
-      const token = await generateToken(data[0], res)
-      return res.status(200).send({ status: true, msg: "Operator logged in..", token , expiresIn : '1H' , role : data[0].user_type })
+      const token = await generateToken(data, res)
+      return res.status(200).send({ status: true, msg: "Operator logged in..", token, expiresIn: '1H', role: data.user_type })
     } else {
       return res.status(404).json({ status: false, msg: "Operator does not exists" })
     }
@@ -61,8 +62,8 @@ const register = async (req, res) => {
   try {
     if (req.operator?.user?.user_type === 'admin') {
       const { name, user_type, url } = req.body;
-      const [data] = await read("SELECT * FROM operator where name = ?", [name]);
-      if (data.length > 0) {
+      const data = variableConfig.operator_data.find(e=> e.name === name) || null
+      if (data) {
         return res.status(200).send({ status: false, msg: "Operator already registered with this name" });
       } else {
         const userId = await generateRandomUserId(name);
@@ -78,6 +79,7 @@ const register = async (req, res) => {
         const hashedPassword = await hashPassword(password);
         let userType = user_type ? user_type : 'operator';
         await write("INSERT  IGNORE INTO operator (name, user_id, password, pub_key, secret, user_type , url) VALUES (?,?,?,?,?, ? , ?)", [name, userId, hashedPassword, pub_key, secret_key, userType, url]);
+        await loadConfig({ loadOperator: true});
         return res.status(200).send({ status: true, msg: "Operator registered successfully", data: { name, userId, password, pub_key, secret_key, user_type, url } });
       }
     } else {
@@ -117,25 +119,25 @@ const userLogin = async (req, res) => {
   try {
     let { id } = req.params;
     let { data } = req.body;
-    const [getOperator] = await write(`SELECT * FROM operator WHERE pub_key = ?`, [id]);
-    if (getOperator.length > 0) {
-      let { user_id, pub_key, secret, url } = getOperator[0];
-      const decodeData = await decryption(data, secret);
-      const token = await generateUUIDv7();
-      let user = await getRedis('users')
-      if (user) {
-        user = JSON.parse(user);
-        user.push(token)
-        await setRedis('users', JSON.stringify(user), 3600 * 24)
-      } else {
-        await setRedis('users', JSON.stringify([token]), 3600 * 24)
-      }
-      url = decodeData?.url ? decodeData.url : url;
-      await setRedis(token, JSON.stringify({ userId: decodeData.user_id, operatorId: user_id, pub_key, secret, url }), 3600 * 24)
-      return res.status(200).send({ status: true, msg: "User authenticated", token });
-    } else {
+    const getOperator = (variableConfig.operator_data.find(e => e.pub_key === id)) || null;
+    if (!getOperator) {
       return res.status(400).send({ status: false, msg: "Request initiated for Invalid Operator" });
     }
+    let { user_id, pub_key, secret, url } = getOperator;
+    const decodeData = await decryption(data, secret);
+    const token = await generateUUIDv7();
+    let user = await getRedis('users')
+    if (user) {
+      user = JSON.parse(user);
+      user.push(token)
+      await setRedis('users', JSON.stringify(user), 3600 * 24)
+    } else {
+      await setRedis('users', JSON.stringify([token]), 3600 * 24)
+    }
+    url = decodeData?.url ? decodeData.url : url;
+    await setRedis(token, JSON.stringify({ userId: decodeData.user_id, operatorId: user_id, pub_key, secret, url }), 3600 * 24)
+    return res.status(200).send({ status: true, msg: "User authenticated", token });
+
   } catch (error) {
     console.log(error)
     return res.status(500).send({ status: false, msg: "Internal Server error" });

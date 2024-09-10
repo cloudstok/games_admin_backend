@@ -1,6 +1,7 @@
 const { default: axios } = require("axios");
 const { read, write } = require("../../utilities/db-connection");
 const { getRedis } = require("../../utilities/redis-connection");
+const { loadConfig } = require("../../utilities/load-config");
 
 
 const getOperatorGame = async (req, res) => {
