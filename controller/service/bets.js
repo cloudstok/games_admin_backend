@@ -8,7 +8,8 @@ const { variableConfig } = require('../../utilities/load-config');
 // Get Bets from Game
 const bets = async (req, res) => {
     try {
-        const data = await fetchAllBets(req.query);
+        const token = req.headers.authorization;
+        const data = await fetchAllBets(req.query, token);
         return res.status(200).send({ status: true, msg: "data found", total : data.total , data : data.data  })
     } catch (er) {
         console.error(er);
