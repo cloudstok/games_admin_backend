@@ -76,6 +76,9 @@ const getUserBalance = async (req, res) => {
 const updateUserBalance = async (req, res) => {
     const logId = await generateUUIDv7();
     const token = req.headers.token;
+    if(!token){
+        return res.status(400).send({ status: false, msg: "Missing token in headers"});
+    }
     const { txn_id, amount, txn_ref_id, description, txn_type, ip, game_id, socket_id, bet_id, user_id } = req.body;
     let game_code = (variableConfig.games_masters_list.find(e=> e.game_id == game_id))?.game_code || null;
     if(!game_code){
