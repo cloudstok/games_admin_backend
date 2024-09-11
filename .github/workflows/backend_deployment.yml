@@ -21,10 +21,7 @@ jobs:
     - name: Install dependencies
       run: npm install
 
-    - name: Build the project
-      run: npm run build
-
-    - name: Copy files to EC2
+    - name: Copy files to EC2 excluding .env
       uses: appleboy/scp-action@v0.1.6
       with:
         host: ${{ secrets.EC2_HOST }}
@@ -32,6 +29,8 @@ jobs:
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         source: "."
         target: "/home/ubuntu/admin-backend"
+        rm: true
+        exclude: ".env"  # Exclude .env file
 
     - name: Restart PM2
       run: |
