@@ -37,5 +37,5 @@ jobs:
         ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} -i ${{ secrets.SSH_PRIVATE_KEY }} << EOF
           cd /home/ubuntu/admin-backend
           npm install
-          pm2 restart all || pm2 start npm --name "admin-backend" -- start
+          pm2 restart all
         EOF
