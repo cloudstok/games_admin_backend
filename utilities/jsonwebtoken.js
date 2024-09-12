@@ -25,7 +25,7 @@ async function verifyToken(req, res, next) {
 }
 
 
-auth = (auth) => async (req, res, next) => {
+const auth = (auth) => async (req, res, next) => {
   
   try {
     const tokenHeader = req.headers.authorization;

@@ -34,6 +34,13 @@ const createDatabasePool = async (config) => {
     }
 };
 
+const getWritePool = () => {
+    if (!writePool) {
+        throw new Error("Write pool not initialized. Make sure to call checkDatabaseConnection() first.");
+    }
+    return writePool;
+};
+
 const initializePools = async () => {
     try {
         readPool = await createDatabasePool(dbConfig);
@@ -52,7 +59,6 @@ const executeQuery = async (pool, query, params = []) => {
             const connection = await pool.getConnection();
             try {
                 const results = await connection.query(query, params);
-                connection.release();
                 return results;
             } finally {
                 connection.release(); 
@@ -82,4 +88,4 @@ const checkDatabaseConnection = async () => {
     console.info("Database connection checks passed for all databases");
 };
 
-module.exports = { read, write, checkDatabaseConnection };
+module.exports = { read, write, checkDatabaseConnection, getWritePool };

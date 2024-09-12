@@ -1,5 +1,5 @@
 const axios = require('axios');
-const { write } = require('../../utilities/db-connection');
+const { write, getWritePool } = require('../../utilities/db-connection');
 const { getWebhookUrl, createOptions, generateUUIDv7 } = require('../../utilities/common_function');
 const { encryption, decryption } = require('../../utilities/ecryption-decryption');
 const { getRedis } = require('../../utilities/redis-connection');
@@ -140,8 +140,8 @@ const handleSuccessEvent = async ({ event, webhookData, backend_base_url, user_i
 };
 
 const handleErrorEvent = async (cashout_retries, rollback_retries, transaction_id, id, res) => {
-    const connection = await write.getConnection();
-
+    const writePool = getWritePool();
+    const connection = await writePool.getConnection();
     try {
         if (cashout_retries >= 10 && rollback_retries >= 10) {
             await connection.beginTransaction();
@@ -167,7 +167,8 @@ const handleErrorEvent = async (cashout_retries, rollback_retries, transaction_i
 
 
 const finalizeTransaction = async (event, webhookData, transaction_id, id, user_id, session_token, operator_id, game_id) => {
-    const connection = await write.getConnection();
+    const writePool = getWritePool();
+    const connection = await writePool.getConnection();
 
     try {
         await connection.beginTransaction();
@@ -300,7 +301,8 @@ const sendRollbackRequest = async (backendBaseUrl, data, userId, operatorId, rol
 };
 
 const finalizeRollback = async (userId, token, operatorId, transactionId, rollbackAmount, txn_ref_id, description, pendingTransactionId, game_id) => {
-    const connection = await write.getConnection();
+    const writePool = getWritePool();
+    const connection = await writePool.getConnection();
     try {
         await connection.beginTransaction();
         const insertTransaction = connection.query(`INSERT IGNORE INTO transaction (user_id, game_id, session_token, operator_id, txn_id, amount, txn_ref_id, description, txn_type, txn_status) VALUES (?)`, [[userId, game_id, token, operatorId, transactionId, rollbackAmount, txn_ref_id, description, '2', '2']]);
