@@ -41,8 +41,10 @@ const logout = async (req, res) => {
 };
 // user Detail
 const getUserDetail = async (req, res) => {
+
     const logId = await generateUUIDv7();
     const token = req.headers.token;
+    console.log({token})
     let logDataReq = {logId, token};
     userLogger.info(JSON.stringify(logDataReq));
     let validateUser;
