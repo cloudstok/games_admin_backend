@@ -66,9 +66,9 @@ const serviceAddGame = async (req, res) => {
         if (req.operator?.user?.user_type !== 'admin') {
             return res.status(401).send({ status: false, msg: "User not authorized to perform the operation" });
         }
-        const { name, url , backendurl, companyname, code } = req.body;
+        const { name, url , backendUrl, companyName, code } = req.body;
         const sql = `INSERT IGNORE INTO games_master_list (name, url , backend_base_url, company_name, game_code) VALUES (?,?,?,?,?)`;
-        await write(sql, [name, url , backendurl, companyname, code]);
+        await write(sql, [name, url , backendUrl, companyName, code]);
         await loadConfig({ loadGames: true});
         return res.status(200).send({ status: true, msg: "Game added successfully to the master's list" });
     } catch (err) {

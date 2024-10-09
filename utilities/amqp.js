@@ -243,7 +243,7 @@ async function handleRetryOrMoveToNextQueue(currentQueue, message, originalMsg, 
             return;
         }
         let rollbackData = {
-            txn_id, amount: getRollbackTransaction[0].amount, txn_ref_id: dbData.txn_ref_id, description: `${getRollbackTransaction[0].amount} Rollback-ed for transaction with reference ID ${dbData.txn_ref_id}`, txn_type: 2
+            txn_id, user_id: dbData.userId, amount: getRollbackTransaction[0].amount, txn_ref_id: dbData.txn_ref_id, description: `${getRollbackTransaction[0].amount} Rollback-ed for transaction with reference ID ${dbData.txn_ref_id}`, txn_type: 2
         }
         const operator = (variableConfig.operator_data.find(e=> e.user_id === dbData.operatorId)) || null;
         message.data.data = await encryption(rollbackData, operator.secret);
@@ -256,10 +256,10 @@ async function handleRetryOrMoveToNextQueue(currentQueue, message, originalMsg, 
     }
 
     if (currentQueue === QUEUES.debit) {
-        console.error(`As DEBIT event is failed in queue ${currentQueue}, initiated failed bet request to the game`);
         await sendNotificationToGame(currentQueue, dbData);
-        subChannel.ack(originalMsg);
-        return;
+        retries = MAX_RETRIES;
+        // subChannel.ack(originalMsg);
+        // return;
     }
 
     message.db_data = dbData;
@@ -278,7 +278,7 @@ async function handleRetryOrMoveToNextQueue(currentQueue, message, originalMsg, 
             }
         }, RETRY_DELAY_MS);
     } else {
-        const nextQueue = currentQueue === QUEUES.cashout ? QUEUES.rollback : QUEUES.failed;
+        const nextQueue = (currentQueue === QUEUES.cashout || QUEUES.debit) ? QUEUES.rollback : QUEUES.failed;
         console.log(`Moving message from ${currentQueue} to ${nextQueue}`);
         retries = 0;
         try {

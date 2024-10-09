@@ -131,6 +131,7 @@ const updateUserBalance = async (req, res) => {
             'Content-Type': 'application/json',
             token
         },
+        timeout: 1000 * 2,
         data: { data: encryptedData }
     };
 
