@@ -202,7 +202,7 @@ async function executeSuccessQueries(queue, responseData) {
     console.log(`Successful ${queue} transaction logged to db`);
     if (queue === QUEUES.rollback) {
         const updateTransaction = write(`UPDATE transaction SET txn_status = "0" WHERE txn_ref_id = ? and txn_type = '1'`, [txn_ref_id]);
-        const updatePendingTransaction = write(`UPDATE pending_transaction SET event = 'rollback', txn_status = '0' WHERE transaction_id = ?`, [transaction_id]);
+        const updatePendingTransaction = write(`UPDATE pending_transactions SET event = 'rollback', txn_status = '0' WHERE transaction_id = ?`, [transaction_id]);
         await Promise.all([updateTransaction, updatePendingTransaction]);
     }
 }
@@ -278,7 +278,7 @@ async function handleRetryOrMoveToNextQueue(currentQueue, message, originalMsg, 
             }
         }, RETRY_DELAY_MS);
     } else {
-        const nextQueue = (currentQueue === QUEUES.cashout || QUEUES.debit) ? QUEUES.rollback : QUEUES.failed;
+        const nextQueue = (currentQueue === QUEUES.cashout || currentQueue === QUEUES.debit) ? QUEUES.rollback : QUEUES.failed;
         console.log(`Moving message from ${currentQueue} to ${nextQueue}`);
         retries = 0;
         try {

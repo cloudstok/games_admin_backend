@@ -1,5 +1,4 @@
 const CryptoJS = require('crypto-js');
-const { json } = require('express');
 
 const encryption = async (plainText , secret) => {
   try{

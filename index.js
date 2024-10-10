@@ -1,4 +1,5 @@
 require('dotenv').config();
+const tracer = require('dd-trace').init();
 const express = require('express');
 const cors = require('cors');
 const { operatorRouter } = require('./routes/operator-route');
