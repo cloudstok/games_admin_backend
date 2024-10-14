@@ -2,7 +2,7 @@
 const { register, login, userLogin, getOperatorList } = require('../controller/service/operator');
 const { serviceAddGame, serviceFindGame, getOperatorGame, getMasterListGames, getOperatorGamesForService, addGameForOperator, getGameURL } = require('../controller/service/game');
 const { addGame, findGame, getGameFromServiceProvider } = require('../controller/operator/game');
-const { getUserBalance, updateUserBalance } = require('../controller/service/wallet');
+const { getUserBalance, updateUserBalance, updateUserBalanceV2 } = require('../controller/service/wallet');
 const { verifyToken, auth } = require('../utilities/jsonwebtoken');
 const { activeUser, getUserDetail, getuserDataFromredis } = require('../controller/service/user');
 const { getransaction, rollbacklist } = require('../controller/service/transaction');
@@ -29,6 +29,8 @@ serviceRouter.post('/user/login/:id', userLogin);
 //Call to Operator's API
 serviceRouter.get('/operator/user/balance', getUserBalance);//
 serviceRouter.post('/operator/user/balance', updateUserBalance);
+//v2 API's
+serviceRouter.post('/v2/operator/user/balance', updateUserBalanceV2);
 serviceRouter.get('/user/detail', getUserDetail);
 serviceRouter.get('/user', getuserDataFromredis);
 // bets 

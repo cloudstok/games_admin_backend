@@ -70,6 +70,10 @@ const getWebhookUrl = async(user_id, event_name) => {
     }
 }
 
+const getRollbackOptions = (data)=> {
+    const { txn_id, amount, } = data;
+}
+
 
 const createOptions =(url, options)=>{
     let token = options.token;

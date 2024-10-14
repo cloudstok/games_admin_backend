@@ -23,6 +23,13 @@ const QUEUES = {
     failed: 'failed_queue',
     errored: 'errored_queue'
 };
+const v2Queues = {
+    failedDebitV2: 'games_failed_debit',
+    rollbackV2: 'games_rollback',
+    cashoutV2: 'games_cashout',
+    failedV2: 'games_failed',
+    erroredV2: 'games_errored'
+};
 const { AMQP_CONNECTION_STRING } = process.env;
 
 async function initQueue() {
@@ -34,9 +41,20 @@ async function initQueue() {
         failed: 'failed_queue',
         errored: 'errored_queue'
     };
-    
+    const v2Queues = {
+        failedDebitV2: 'games_failed_debit',
+        rollbackV2: 'games_rollback',
+        cashoutV2: 'games_cashout',
+        failedV2: 'games_failed',
+        erroredV2: 'games_errored'
+    };
     for (const [key, queue] of Object.entries(Queues)) {
         await consumeQueue(queue, handleMessage);
+        
+    }
+    for (const [key, queue] of Object.entries(v2Queues)) {
+        await consumeQueue(queue, handleQueueMessage);
+        
     }
     logger.info('RabbitMQ queues are being consumed');
 }
@@ -100,6 +118,17 @@ async function consumeQueue(queue, handler) {
     } catch (error) {
         rabbitMQLogger.error(`Queue processing error: ${error.message}`);
         throw error;
+    }
+}
+
+async function handleQueueMessage(queue, msg){
+    let logId = await generateUUIDv7();
+    const message = JSON.parse(msg.content.toString());
+    const logReqObj = { logId, message};
+    const retries = msg.properties.headers['x-retries'] || 0;
+    let options;
+    if(queue == v2Queues.rollbackV2){
+        options;
     }
 }
 
