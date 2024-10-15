@@ -1,7 +1,7 @@
 const client = require("amqplib");
 const axios = require('axios');
 const { write } = require("./db-connection");
-const { generateUUIDv7 } = require("./common_function");
+const { generateUUIDv7, getRollbackOptions, getCashoutOptions } = require("./common_function");
 const { encryption } = require("./ecryption-decryption");
 const createLogger = require('../utilities/logger');
 const { variableConfig } = require("./load-config");
@@ -48,11 +48,11 @@ async function initQueue() {
         failedV2: 'games_failed',
         erroredV2: 'games_errored'
     };
-    for (const [key, queue] of Object.entries(Queues)) {
+    for (const queue of Object.values(Queues)) {
         await consumeQueue(queue, handleMessage);
         
     }
-    for (const [key, queue] of Object.entries(v2Queues)) {
+    for (const queue of Object.values(v2Queues)) {
         await consumeQueue(queue, handleQueueMessage);
         
     }
@@ -126,9 +126,31 @@ async function handleQueueMessage(queue, msg){
     const message = JSON.parse(msg.content.toString());
     const logReqObj = { logId, message};
     const retries = msg.properties.headers['x-retries'] || 0;
-    let options;
-    if(queue == v2Queues.rollbackV2){
-        options;
+
+    if (queue == v2Queues.failedV2) {
+        console.error(`Message permanently failed in ${queue}: ${JSON.stringify(message)}`);
+        subChannel.ack(msg);
+        return;
+    }
+
+    let postData;
+    if(queue == v2Queues.rollbackV2 && retries == 0) postData = await getRollbackOptions(message);
+    if(queue == v2Queues.cashoutV2 && retries == 0) postData =  await getCashoutOptions(message);
+    else postData = message;
+    try{
+        const response = await axios(postData.options);
+        if(response.status == 200){
+            thirdPartyLogger.info(JSON.stringify({ req: logReqObj, res: response?.data}));
+            console.log(`Request succeeded for ${queue}:`, response.data);
+            await executeSuccessQueriesV2(queue, postData.dbData);
+            subChannel.ack(msg);
+        }
+    }catch(err){
+        if(err?.response?.status == 404 && queue == v2Queues.rollbackV2){
+            thirdPartyLogger.info(JSON.stringify({ req: logReqObj, res: err?.response?.status}));
+            await executeSuccessQueriesV2(queue, options.dbData);
+            subChannel.ack(msg);
+        } else await handleRetryOrMoveToNextQueueV2(queue, options, msg, retries);
     }
 }
 
@@ -236,6 +258,17 @@ async function executeSuccessQueries(queue, responseData) {
     }
 }
 
+async function executeSuccessQueriesV2(queue, responseData) {
+    let { userId, token, operatorId, txn_id, amount, txn_ref_id, description, txn_type, game_id } = responseData;
+    await write("INSERT IGNORE INTO transaction (user_id, game_id , session_token , operator_id, txn_id, amount,  txn_ref_id , description, txn_type, txn_status) VALUES (?)", [[userId, game_id, token, operatorId, txn_id, amount, txn_ref_id, description, `${txn_type}`, '2']]);
+    console.log(`Successful ${queue} transaction logged to db`);
+}
+
+async function executeFailureQueriesV2(queue, data) {
+    const { userId, token, operatorId, txn_id, amount, txn_ref_id, description, txn_type, game_id } = data;
+    await write("INSERT IGNORE INTO transaction (user_id, game_id, session_token, operator_id, txn_id, amount,  txn_ref_id, description, txn_type, txn_status) VALUES (?)", [[userId, game_id, token, operatorId, txn_id, amount, txn_ref_id, description, `${txn_type}`, '0']]);
+    console.log(`Successful ${queue} transaction logged to db`);
+}
 
 
 async function handleFailure(queue, data, message, retries) {
@@ -259,6 +292,38 @@ async function executeCashoutFailureQueries(data, message) {
     }
 }
 
+async function handleRetryOrMoveToNextQueueV2(currentQueue, message, originalMsg, retries) {
+
+    retries += 1;
+
+    if(currentQueue == v2Queues.cashoutV2 && retries < MAX_RETRIES){
+
+    }
+
+    if (retries <= MAX_RETRIES) {
+        console.log(`Retrying message in ${currentQueue} (retry #${retries})`);
+        setTimeout(async () => {
+            try {
+                await sendToQueue('', currentQueue, JSON.stringify(message), 100, retries);
+                subChannel.ack(originalMsg);
+            } catch (error) {
+                console.error(`Failed to retry message in ${currentQueue}: ${error.message}`);
+                subChannel.nack(originalMsg);
+            }
+        }, 100);
+    } else {
+        const nextQueue = currentQueue === v2Queues.cashoutV2 ? v2Queues.rollbackV2 : v2Queues.failedV2;
+        console.log(`Moving message from ${currentQueue} to ${nextQueue}`);
+        retries = 0;
+        try {
+            await sendToQueue('', nextQueue, JSON.stringify(message), 0, retries);
+            subChannel.ack(originalMsg);
+        } catch (error) {
+            console.error(`Failed to move message from ${currentQueue} to ${nextQueue}: ${error.message}`);
+            subChannel.nack(originalMsg);
+        }
+    }
+}
 
 async function handleRetryOrMoveToNextQueue(currentQueue, message, originalMsg, retries, dbData) {
 

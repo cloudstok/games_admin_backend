@@ -219,7 +219,7 @@ const updateUserBalanceV2 = async (req, res) => {
         return res.status(200).send({ status: true, msg: 'Balance updated successfully'});
     }catch(err){
         failedUpdateBalanceLogger.info(JSON.stringify({ req: logDataReq, res: err?.response?.data, statusCode: err?.response?.status}));
-        await sendToQueue('', 'games_rollback', JSON.stringify({...req.body, token, game_code, operatorUrl, secret}), 100);
+        await sendToQueue('', 'games_rollback', JSON.stringify({...req.body, token, game_code, operatorUrl, secret, operatorId}), 100);
         return res.status(500).send({ status: false, msg: "Internal Server error" });
     }
 };

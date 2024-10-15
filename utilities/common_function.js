@@ -70,8 +70,49 @@ const getWebhookUrl = async(user_id, event_name) => {
     }
 }
 
-const getRollbackOptions = (data)=> {
-    const { txn_id, amount, } = data;
+const getRollbackOptions = async(data)=> {
+    const { amount, txn_id, ip, game_id, user_id, game_code, secret, operatorUrl, token} = data;
+    const trx_id = generateUUIDv7();
+    const description = `${amount} Rollback-ed for transaction with reference ID ${txn_id}`
+    let encryptedData;
+    try {
+        encryptedData = await encryption({ amount, txn_id: trx_id, txn_ref_id: txn_id, description, txn_type: 2, ip, game_id, user_id, game_code }, secret);
+    } catch (err) {
+        return;
+    }
+    const postOptions = {
+        method: 'POST',
+        url: operatorUrl,
+        headers: {
+            'Content-Type': 'application/json',
+            token
+        },
+        timeout: 1000 * 3,
+        data: { data: encryptedData }
+    };
+    const dbData = { txn_id: trx_id, description, txn_ref_id: txn_id, txn_type: 2, amount, game_id, userId: user_id, token, operatorId: data.operatorId};
+    return {options: postOptions, dbData};
+}
+
+const getCashoutOptions = async(data)=> {
+    const { amount, txn_id, txn_ref_id, ip, game_id, user_id, txn_type, game_code, secret, operatorUrl, token, description} = data;
+    let encryptedData;
+    try {
+        encryptedData = await encryption({ amount, txn_id, txn_ref_id, description, txn_type, ip, game_id, user_id, game_code }, secret);
+    } catch (err) {
+        return;
+    }
+    const postOptions = {
+        method: 'POST',
+        url: operatorUrl,
+        headers: {
+            'Content-Type': 'application/json',
+            token
+        },
+        timeout: 1000 * 3,
+        data: { data: encryptedData }
+    };
+    return {options: postOptions, dbData: data};
 }
 
 
@@ -91,4 +132,4 @@ const createOptions =(url, options)=>{
     return clientServerOptions
 }
 
-module.exports = { generateRandomString, generateRandomUserId, generateUUID , generateUUIDv7, getWebhookUrl, createOptions}
+module.exports = { generateRandomString, generateRandomUserId, generateUUID , generateUUIDv7, getWebhookUrl, createOptions, getRollbackOptions, getCashoutOptions}
