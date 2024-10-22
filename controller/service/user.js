@@ -27,6 +27,7 @@ const activeUser = async (req, res) => {
 
 const logout = async (req, res) => {
     try {
+    //    await storeStates()
         const token = req.headers.token;
         const user = JSON.parse(await getRedis('users')) || [];
         const activeUser = user.filter(activeToken => activeToken !== token);

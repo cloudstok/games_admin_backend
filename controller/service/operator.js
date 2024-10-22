@@ -4,15 +4,13 @@ const { read, write } = require('../../utilities/db-connection')
 const { generateToken } = require('../../utilities/jsonwebtoken')
 const { generateRandomString, generateRandomUserId, generateUUID, generateUUIDv7 } = require('../../utilities/common_function')
 const { decryption } = require('../../utilities/ecryption-decryption')
-const { setRedis, getRedis, deleteRedis } = require('../../utilities/redis-connection')
+const { setRedis, getRedis } = require('../../utilities/redis-connection')
 const { variableConfig, loadConfig } = require('../../utilities/load-config')
-
-
-// Operator login API
 const login = async (req, res) => {
   try {
     const { userId, password } = req.body
-    const data = variableConfig.operator_data.find(e=> e.user_id === userId) || null;
+    // const data = variableConfig.operator_data.find(e=> e.user_id === userId) || null;
+    const data =[ ...variableConfig.user_credentials , ...variableConfig.operator_data].find(e=> e.user_id === userId) || null;
     if (data) {
       const checkPassword = await compare(password, data.password)
       if (!checkPassword) {
@@ -46,6 +44,7 @@ const OperatorchangePassword = async (req, res) => {
       } else {
         const hashedPassword = await hashPassword(newPassword);
         await read("update operator set password = ? where user_id = ?", [hashedPassword, user_id])
+        await read("update user_credentials set password = ? where user_id = ?", [hashedPassword, user_id])
         return res.status(200).send({ status: true, msg: "change password successfully" })
       }
     } else {
@@ -60,7 +59,6 @@ const OperatorchangePassword = async (req, res) => {
 // Operator Register Successfully
 const register = async (req, res) => {
   try {
-    if (req.operator?.user?.user_type === 'admin') {
       const { name, user_type, url } = req.body;
       const data = variableConfig.operator_data.find(e=> e.name === name) || null
       if (data) {
@@ -79,17 +77,20 @@ const register = async (req, res) => {
         const hashedPassword = await hashPassword(password);
         let userType = user_type ? user_type : 'operator';
         await write("INSERT  IGNORE INTO operator (name, user_id, password, pub_key, secret, user_type , url) VALUES (?,?,?,?,?, ? , ?)", [name, userId, hashedPassword, pub_key, secret_key, userType, url]);
+      await write("INSERT IGNORE INTO user_credentials (user_id, password, user_type) VALUES (?, ?, ?)", [userId, hashedPassword, user_type]);
+
         await loadConfig({ loadOperator: true});
         return res.status(200).send({ status: true, msg: "Operator registered successfully", data: { name, userId, password, pub_key, secret_key, user_type, url } });
       }
-    } else {
-      return res.status(401).send({ status: false, msg: "User not authorized to perform the operation" });
-    }
+   
   } catch (error) {
     console.log(error)
     return res.status(500).send({ status: false, msg: "Internal Server error" });
   }
 }
+
+
+
 
 const getOperatorList = async (req, res) => {
   try {
@@ -100,12 +101,10 @@ const getOperatorList = async (req, res) => {
       return res.status(400).send({ status: false, msg: "Invalid limit or offset" });
     }
 
-    if (req.operator?.user?.user_type === 'admin') {
+   
       const [operatorList] = await write(`SELECT  * FROM operator where user_type = 'operator' and is_deleted = 0 limit ? offset ?`, [+limit, +offset]);
       return res.status(200).send({ status: true, msg: "Operators list fetched successfully", data: operatorList });
-    } else {
-      return res.status(401).send({ status: false, msg: "User not authorized to perform the operation" });
-    }
+  
   } catch (error) {
     console.log(error)
     return res.status(500).send({ status: false, msg: "Internal Server error" });
@@ -135,7 +134,7 @@ const userLogin = async (req, res) => {
       await setRedis('users', JSON.stringify([token]), 3600 * 24)
     }
     url = decodeData?.url ? decodeData.url : url;
-    await setRedis(token, JSON.stringify({ userId: decodeData.user_id, operatorId: user_id, pub_key, secret, url }), 3600 * 24)
+    await setRedis(token, JSON.stringify({ userId: decodeData.user_id, operatorId: user_id, pub_key, secret, url, createdAt: Date.now() }), 3600 * 16)
     return res.status(200).send({ status: true, msg: "User authenticated", token });
 
   } catch (error) {

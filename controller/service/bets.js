@@ -1,16 +1,21 @@
 const axios = require('axios');
-const { write, getWritePool } = require('../../utilities/db-connection');
-const { getWebhookUrl, createOptions, generateUUIDv7 } = require('../../utilities/common_function');
+const { write } = require('../../utilities/db-connection');
+const { generateUUIDv7, getTransactionOptions, getTransactionForRollback } = require('../../utilities/common_function');
 const { encryption, decryption } = require('../../utilities/ecryption-decryption');
-const { getRedis } = require('../../utilities/redis-connection');
 const { variableConfig } = require('../../utilities/load-config');
+const createLogger = require('../../utilities/logger');
+const transactionRetryLogger  = createLogger('transactionRetry', 'jsonl');
+const manualRollbackLogger = createLogger('manualRollback', 'jsonl');
+const failedTransactionRetryLogger  = createLogger('failedTransactionRetry', 'jsonl');
+const failedManualRollbackLogger = createLogger('failedManualRollback', 'jsonl');
 
 // Get Bets from Game
 const bets = async (req, res) => {
     try {
+        req.query.game = req.query.game.replace(' ', '_');
         const token = req.headers.authorization;
         const data = await fetchAllBets(req.query, token);
-        return res.status(200).send({ status: true, msg: "data found", total : data.total , data : data.data  })
+        return res.status(200).send({ status: true, msg: "data found", data: data.data })
     } catch (er) {
         console.error(er);
         return res.status(500).send({ status: false, msg: "internal server Error", er })
@@ -29,172 +34,89 @@ async function fetchAllBets(data, token) {
         });
         return response.data;
     } catch (error) {
-        handleRequestError(error);
+        console.error(error?.response?.data);
     }
 }
 
 
-function handleRequestError(error) {
-    if (error.response) {
-        console.error(`Request failed with status ${error.response.status}: ${error.response.data}`);
-    } else if (error.request) {
-        console.error('No response received from server:', error.request);
-    } else {
-        console.error('Error in request setup:', error.message);
+function removeNullValues(obj) {
+    const filteredObj = {};
+    for (const key in obj) {
+        if (obj[key] !== null && obj[key] !== undefined  && obj[key] !== 'null') {
+            filteredObj[key] = obj[key]; // Keep the key-value pair
+        }
     }
-    throw new Error('Failed to fetch bets');
+
+    return filteredObj; // Return the new object with null values removed
+}
+const report = async (req, res) => {
+    try {
+        req.query.game = req.query.game.replace(' ', '_');
+        const data = await fetchAllreport(removeNullValues(req.query));
+        return res.status(200).send({ status: true, msg: "data found", data })
+    } catch (er) {
+        return res.status(500).send({ status: false, msg: "internal server Error"})
+    }
 }
 
+async function fetchAllreport(data) {
+    const params = { ...data };
+    const url = process.env.STATS_BASE_URL + `/${params.game}/mis/report`;
+    delete params.game;
+    const queryString = new URLSearchParams(params).toString();
+    const fullUrl = queryString ? `${url}?${queryString}` : url; // Append query string if params exist
+    try {
+        const response = await axios.get(fullUrl);
+        return response.data.data;
+    } catch (error) {
+        console.error(error?.response?.data);
+    }
+}
+
+async function executeTransactionQuery(responseData, requestData) {
+    try {
+        if(requestData.txn_status == '0' && requestData.event == 'retry'){
+            await write(`UPDATE transaction SET txn_status = '2' WHERE txn_id = ?`, [requestData.txn_id]);
+            console.log(`Transaction updated`);
+        }else if(requestData.event == 'rollback'){
+            const { user_id, token, operatorId, txn_id, amount, txn_ref_id, description, txn_type, game_id } = responseData;
+            await write("INSERT INTO transaction (user_id, game_id , session_token , operator_id, txn_id, amount,  txn_ref_id , description, txn_type, txn_status) VALUES (?)", [[user_id, game_id, token, operatorId, txn_id, amount, txn_ref_id, description, `${txn_type}`, '2']]);
+            console.log(`transaction logged to db`);
+        }
+        return;
+    } catch (err) {
+        console.log(err);
+    }
+}
 
 //Admin Rollback or Cashout Retry
-const manualCashoutOrRollback = async (req, res) => {
+const retryTransaction = async (req, res) => {
     try {
-        const { id, event, operator_id, description, amount, txn_ref_id, user_id, session_token, backend_base_url, game_id } = req.body;
-        const [getTransaction] = await write(`SELECT * FROM pending_transactions where id = ? and txn_status = '1'`, [id]);
-        if (getTransaction.length === 0) {
-            return res.status(400).send({ status: false, msg: "No pending history found for the transaction id" });
+        const { user_id, game_id, session_token, operator_id, txn_id, amount, txn_ref_id, description, txn_type, txn_status, event } = req.body;
+        let postData;
+        if(event == 'rollback' && txn_type == '2') return res.status(400).send({ status: false, msg: "Rollback can't be initiated on a rollbacked transaction"});
+        if(event == 'retry') postData = await getTransactionOptions({amount, txn_id, txn_ref_id, ip: req.headers['x-forwarded-for'], game_id, user_id, operatorId: operator_id, txn_type, token: session_token, description});
+        if(event == 'rollback') postData = await getTransactionForRollback({...req.body, ip: req.headers['x-forwarded-for']});
+        const options = postData.options;
+        if(!options) return res.status(400).send({ status: false, msg: "Something went wrong while processing Transaction"});
+        try{
+            const response = await axios(options);
+            if(response?.status == 200){
+                const logData = { req: req.body, options, res: response?.data};
+                event == 'retry' ? transactionRetryLogger.info(JSON.stringify(logData)) : manualRollbackLogger.info(JSON.stringify({...logData, rollbackData: postData.dbData}));
+                await executeTransactionQuery(postData.dbData, req.body);
+                return res.status(200).send({ status: true, msg: `Transaction ${event} execution successful`})
+            }
+        }catch(err){
+            const logData = { req: req.body, options, res: err?.response?.status};
+            event == 'retry' ? failedTransactionRetryLogger.error(JSON.stringify(logData)) : failedManualRollbackLogger.error(JSON.stringify({...logData, rollbackData: postData.dbData}));
+            return res.status(400).send({ status: false, msg: "Internal Server Error"});
         }
-        const transaction = getTransaction[0];
-        if (!isValidEvent(event)) {
-            return res.status(400).send({ status: false, msg: "only cashout or rollback is permitted on transaction" });
-        }
-        if (isRetryLimitExceeded(event, transaction)) {
-            return res.status(400).send({ status: false, msg: `Maximum ${event} retries exceeded` });
-        }
-        const operator = (variableConfig.operator_data.find(e=> e.user_id === operator_id)) || null;
-        if (!operator) {
-            return res.status(400).send({ status: false, msg: "Invalid Operator Requested or operator does not exist" });
-        }
-        const secret = operator.secret;
-        const operatorUrl = await getWebhookUrl(operator_id, "UPDATE_BALANCE");
-        if (!operatorUrl) {
-            return res.status(400).send({ status: false, msg: "No URL configured for the event" });
-        }
-        await processEvent({ event, transaction, operatorUrl, secret, amount, description, txn_ref_id, user_id, session_token, backend_base_url, operator_id, id, game_id, res });
-    } catch (er) {
+          } catch (er) {
         console.error(er);
-        return res.status(500).send({ status: false, msg: "internal server Error", er });
+        return res.status(500).send({ status: false, msg: "internal server Error" });
     }
 };
-
-const isValidEvent = (event) => {
-    return event === 'cashout' || event === 'rollback';
-};
-
-const isRetryLimitExceeded = (event, transaction) => {
-    const { cashout_retries, rollback_retries } = transaction;
-    return (event === 'cashout' && cashout_retries >= 10) || (event === 'rollback' && rollback_retries >= 10);
-};
-
-const processEvent = async ({ event, transaction, operatorUrl, secret, amount, description, txn_ref_id, user_id, session_token, backend_base_url, operator_id, id, game_id, res }) => {
-    let { options, cashout_retries, rollback_retries, transaction_id } = transaction;
-    event === 'cashout' ? cashout_retries += 1 : rollback_retries += 1;
-    const [getRollbackTransaction] = await write(`SELECT * FROM transaction WHERE txn_id = ?`, [txn_ref_id]);
-    const txn_id = await generateUUIDv7();
-    const settleAmount = event === 'cashout' ? amount : getRollbackTransaction[0].amount;
-    const settleDescription = event === 'cashout' ? description : `${settleAmount} Rollback-ed for transaction with reference ID ${txn_ref_id}`;
-    const txn_type = event === 'cashout' ? 1 : 2;
-    const webhookData = { txn_id, amount: settleAmount, txn_ref_id, description: settleDescription, txn_type, token: options.headers.token };
-    const requestOptions = createOptions(operatorUrl, webhookData);
-    requestOptions.data.data = await encryption(requestOptions.data.data, secret);
-    await write(`UPDATE pending_transactions SET cashout_retries = ?, rollback_retries = ? WHERE id = ?`, [cashout_retries, rollback_retries, id]);
-    try {
-        const data = await axios(requestOptions);
-        if (data.status === 200) {
-            await handleSuccessEvent({ event, webhookData, backend_base_url, user_id, operator_id, session_token, getRollbackTransaction, id, transaction_id, game_id, res });
-        } else {
-            await handleErrorEvent(cashout_retries, rollback_retries, transaction_id, id, res);
-        }
-    } catch (err) {
-        await handleErrorEvent(cashout_retries, rollback_retries, transaction_id, id, res);
-    }
-};
-
-const handleSuccessEvent = async ({ event, webhookData, backend_base_url, user_id, operator_id, session_token, getRollbackTransaction, id, transaction_id, game_id, res }) => {
-    delete webhookData.token;
-    const options = {
-        method: 'POST',
-        url: backend_base_url + '/settleBet',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        data: {
-            ...webhookData,
-            userId: user_id,
-            operatorId: operator_id,
-            rollbackMsg: event === 'cashout' ? null : getRollbackTransaction[0].description
-        }
-    };
-    try {
-        const data = await axios(options);
-        if (data.status === 200) {
-            console.log(`[SUCCESS] Response from game for ${event} event is:::`, JSON.stringify(data.data));
-        } else {
-            console.log(`[Error] Response from game for ${event} event is:::`, JSON.stringify(data.data));
-        }
-    } catch (err) {
-        console.error(`[Error] Response from game for ${event} event is:::`, JSON.stringify(err?.response?.data));
-    }
-    await finalizeTransaction(event, webhookData, transaction_id, id, user_id, session_token, operator_id, game_id);
-    return res.status(200).send({ status: true, msg: `Bet successfully settled for ${event} event` });
-};
-
-const handleErrorEvent = async (cashout_retries, rollback_retries, transaction_id, id, res) => {
-    const writePool = getWritePool();
-    const connection = await writePool.getConnection();
-    try {
-        if (cashout_retries >= 10 && rollback_retries >= 10) {
-            await connection.beginTransaction();
-
-            const updateTransaction = connection.query(`UPDATE transaction SET txn_status = '0' WHERE id = ?`, [transaction_id]);
-            const updatePendingTransaction = connection.query(`UPDATE pending_transactions SET txn_status = '0' WHERE id = ?`, [id]);
-            await Promise.all([updateTransaction, updatePendingTransaction]);
-
-            await connection.commit();
-
-            return res.status(400).send({ status: false, msg: `Maximum cashout or rollback limit reached, Event is failed` });
-        }
-
-        return res.status(400).send({ status: false, msg: `Request failed from Operator upstream server` });
-    } catch (error) {
-        await connection.rollback();
-        console.error('Transaction failed: ', error.message);
-        return res.status(500).send({ status: false, msg: 'Internal Server Error' });
-    } finally {
-        connection.release();
-    }
-};
-
-
-const finalizeTransaction = async (event, webhookData, transaction_id, id, user_id, session_token, operator_id, game_id) => {
-    const writePool = getWritePool();
-    const connection = await writePool.getConnection();
-
-    try {
-        await connection.beginTransaction();
-
-        if (event === 'cashout') {
-            const updateTransaction = connection.query(`UPDATE transaction SET txn_id = ?, txn_status = '2' WHERE id = ?`, [webhookData.txn_id, transaction_id]);
-            const updatePendingTransaction = connection.query(`UPDATE pending_transactions SET event = 'cashout', txn_status = '2' WHERE id = ?`, [id]);
-            await Promise.all([updateTransaction, updatePendingTransaction]);
-        } else {
-            webhookData.txn_type = `${webhookData.txn_type}`;
-            const insertRollbackTransaction = connection.query(`INSERT IGNORE INTO transaction (user_id, game_id, session_token, operator_id, txn_id, amount, txn_ref_id, description, txn_type, txn_status) VALUES (?)`, [[user_id, game_id, session_token, operator_id, ...Object.values(webhookData), '2']]);
-            const updateTransaction = connection.query(`UPDATE transaction SET txn_status = '0' WHERE id = ?`, [transaction_id]);
-            const updatePendingTransaction = connection.query(`UPDATE pending_transactions SET event = 'rollback', txn_status = '2' WHERE id = ?`, [id]);
-            await Promise.all([insertRollbackTransaction, updateTransaction, updatePendingTransaction]);
-        }
-
-        await connection.commit();
-    } catch (error) {
-        await connection.rollback();
-        console.error('Transaction failed: ', error.message);
-        throw error;
-    } finally {
-        connection.release();
-    }
-};
-
 
 
 // Operator Rollback
@@ -202,62 +124,46 @@ const operatorRollback = async (req, res) => {
     try {
         const { token } = req.headers;
         const { data } = req.body;
-        const validateUser = await getValidatedUser(token);
-        if (!validateUser) {
-            return res.status(401).send({ status: false, msg: "Token Expired or Request timed out.!" });
-        }
-        const { userId, operatorId } = validateUser;
+        const operatorId = req.params.operatorId;
         const operator = await getOperator(operatorId);
         if (!operator) {
             return res.status(400).send({ status: false, msg: "Request initiated for Invalid Operator" });
         }
         const secret = operator.secret;
         const decodeData = await decryption(data, secret);
+        const userId = decodeData.user_id;
         const txn_ref_id = decodeData.txnRefId;
-        const [[{ id, backend_base_url, game_id }]] = await getPendingTransaction(txn_ref_id);
-        if (!id) {
-            return res.status(400).send({ status: false, msg: "No Pending Credits for this Reference ID" });
+        const [pendingTxn] = await getPendingTransaction(txn_ref_id);
+        if (!pendingTxn) {
+            return res.status(400).send({ status: false, msg: "No Pending Credits for this Transaction ID" });
         }
-        const rollbackTransaction = await getRollbackTransaction(txn_ref_id);
-        if (rollbackTransaction.length === 0) {
-            return res.status(400).send({ status: false, msg: "No transaction found for the given reference ID" });
-        }
-        const rollbackAmount = rollbackTransaction[0].amount;
+        const rollbackAmount = pendingTxn[0].amount;
         const transactionId = await generateUUIDv7();
         const transactionData = {
             txn_id: transactionId,
             txn_ref_id,
             amount: rollbackAmount,
             description: `${rollbackAmount} Rollback-ed for transaction with reference ID ${txn_ref_id}`,
-            txn_type: 2
+            txn_type: 2,
+            user_id: userId
         };
 
-        const response = await sendRollbackRequest(backend_base_url, transactionData, userId, operatorId, rollbackTransaction[0].description, token, secret);
-        if (response?.status === 200) {
-            await finalizeRollback(userId, token, operatorId, transactionId, rollbackAmount, txn_ref_id, transactionData.description, id, game_id);
-            return res.status(200).send({ status: true, msg: `Bet rollback-ed successfully for reference ID ${txn_ref_id}`, data: await encryption(transactionData, secret) });
-        } else {
-            return res.status(response.status).send({ status: false, msg: `Request failed from upstream server with response:: ${JSON.stringify(response.data)}` });
-        }
+        await insertRollbackData(userId, token, operatorId, transactionId, rollbackAmount, txn_ref_id, transactionData.description, pendingTxn[0].game_id);
+        return res.status(200).send({ status: true, msg: `Bet rollback-ed successfully for reference ID ${txn_ref_id}`, data: await encryption(transactionData, secret) });
     } catch (er) {
         console.error(er);
         return res.status(500).send({ status: false, msg: "internal server Error", er });
     }
 };
 
-const getValidatedUser = async (token) => {
-    try {
-        let validateUser = await getRedis(token);
-        return JSON.parse(validateUser);
-    } catch (error) {
-        console.error('Error validating user:', error);
-        throw new Error('User validation failed');
-    }
-};
+const insertRollbackData = async(userId, token, operatorId, transactionId, rollbackAmount, txn_ref_id, description, game_id) => {
+    await write(`INSERT IGNORE INTO transaction (user_id, game_id, session_token, operator_id, txn_id, amount, txn_ref_id, description, txn_type, txn_status) VALUES (?)`, [[userId, game_id, token, operatorId, transactionId, rollbackAmount, txn_ref_id, description, '2', '2']])
+}
+
 
 const getOperator = async (operatorId) => {
     try {
-        const getOperator = (variableConfig.operator_data.find(e=> e.user_id === operatorId)) || null;
+        const getOperator = (variableConfig.operator_data.find(e => e.user_id === operatorId)) || null;
         return getOperator;
     } catch (error) {
         console.error('Error fetching operator:', error);
@@ -267,7 +173,7 @@ const getOperator = async (operatorId) => {
 
 const getPendingTransaction = async (txn_ref_id) => {
     try {
-        const [getPendingTransaction] = await write(`SELECT gm.backend_base_url, tr.id, gm.game_id FROM transaction as tr inner join inner join games_master_list as gm on gm.game_id = tr.game_id WHERE tr.txn_ref_id = ? and tr.txn_type = '1' and tr.txn_status = '1'`, [txn_ref_id]);
+        const [getPendingTransaction] = await write(`SELECT * FROM transaction WHERE txn_id = ? and txn_status = '0'`, [txn_ref_id]);
         return getPendingTransaction;
     } catch (error) {
         console.error('Error fetching pending transaction:', error);
@@ -275,50 +181,5 @@ const getPendingTransaction = async (txn_ref_id) => {
     }
 };
 
-const getRollbackTransaction = async (txn_ref_id) => {
-    try {
-        const [getRollbackTransaction] = await write(`SELECT * FROM transaction WHERE txn_id = ?`, [txn_ref_id]);
-        return getRollbackTransaction;
-    } catch (error) {
-        console.error('Error fetching rollback transaction:', error);
-        throw new Error('Rollback transaction fetch failed');
-    }
-};
 
-const sendRollbackRequest = async (backendBaseUrl, data, userId, operatorId, rollbackMsg, token, secret) => {
-    try {
-        const options = {
-            method: 'POST',
-            url: `${backendBaseUrl}/settleBet`,
-            headers: { 'Content-Type': 'application/json' },
-            data: { ...data, userId, operatorId, rollbackMsg }
-        };
-        return await axios(options);
-    } catch (error) {
-        console.error('Error sending rollback request:', error?.response?.data);
-        throw new Error('Rollback request failed');
-    }
-};
-
-const finalizeRollback = async (userId, token, operatorId, transactionId, rollbackAmount, txn_ref_id, description, pendingTransactionId, game_id) => {
-    const writePool = getWritePool();
-    const connection = await writePool.getConnection();
-    try {
-        await connection.beginTransaction();
-        const insertTransaction = connection.query(`INSERT IGNORE INTO transaction (user_id, game_id, session_token, operator_id, txn_id, amount, txn_ref_id, description, txn_type, txn_status) VALUES (?)`, [[userId, game_id, token, operatorId, transactionId, rollbackAmount, txn_ref_id, description, '2', '2']]);
-        const updatePendingTransaction = connection.query(`UPDATE pending_transactions SET event = 'rollback', txn_status = '2' WHERE transaction_id = ?`, [pendingTransactionId]);
-        const updateTransaction = connection.query(`UPDATE transaction SET txn_status = '0' WHERE id = ?`, [pendingTransactionId]);
-        await Promise.all([insertTransaction, updatePendingTransaction, updateTransaction]);
-        await connection.commit();
-    } catch (error) {
-        await connection.rollback();
-        console.error('Error finalizing rollback:', error);
-        throw new Error('Rollback finalization failed');
-    } finally {
-        connection.release();
-    }
-};
-
-
-
-module.exports = { bets, operatorRollback, manualCashoutOrRollback }
+module.exports = { bets, operatorRollback, retryTransaction, report }

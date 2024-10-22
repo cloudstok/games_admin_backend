@@ -2,7 +2,7 @@ const { read } = require("../../utilities/db-connection");
 
 const getransaction = async (req, res) => {
     try {
-        let { limit = 100, offset = 0, user_id, operator_id, game_id } = req.query;
+        let { limit = 100, offset = 0, user_id, operator_id, game_id , txn_id, txn_ref_id, lobby_id} = req.query;
         limit = parseInt(limit);
         offset = parseInt(offset);
         if (isNaN(limit) || isNaN(offset)) {
@@ -23,6 +23,21 @@ const getransaction = async (req, res) => {
             whereConditions.push('operator_id = ?');
             params.push(operator_id);
         }
+
+        if (txn_id) {
+            whereConditions.push('txn_id = ?');
+            params.push(txn_id);
+        }
+
+        if (txn_ref_id) {
+            whereConditions.push('txn_ref_id = ?');
+            params.push(txn_ref_id);
+        }
+
+        if (lobby_id) {
+            whereConditions.push('description like ?');
+            params.push('%'+lobby_id);
+        }
         if (whereConditions.length > 0) {
             sql += ' WHERE ' + whereConditions.join(' AND ');
         }
@@ -41,7 +56,7 @@ const rollbacklist = async (req, res) => {
     try {
         const params = [];
         let whereConditions = [];
-        let { limit = 100, offset = 0, operator_id, game_id } = req.query;
+        let { limit = 100, offset = 0, operator_id, game_id   , transaction_id} = req.query;
         limit = parseInt(limit);
         offset = parseInt(offset);
         if (isNaN(limit) || isNaN(offset)) {
@@ -54,6 +69,10 @@ const rollbacklist = async (req, res) => {
         if (operator_id) {
             whereConditions.push('tn.operator_id = ?');
             params.push(operator_id);
+        }
+        if (transaction_id) {
+            whereConditions.push('tn.transaction_id = ?');
+            params.push(transaction_id);
         }
         let whereClause = '';
         if (whereConditions.length > 0) {

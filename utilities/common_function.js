@@ -1,18 +1,22 @@
 const crypto = require('crypto');
 const { variableConfig } = require('./load-config');
+const { getRedis } = require('./redis-connection');
+const { encryption } = require('./ecryption-decryption');
+const axios = require('axios');
+const { write, read } = require('./db-connection');
 async function generateRandomString(length) {
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     let randomString = "";
     for (let i = 0; i < length; i++) {
-      randomString += chars[Math.floor(Math.random() * chars.length)];
+        randomString += chars[Math.floor(Math.random() * chars.length)];
     }
     return randomString;
-  }
+}
 
-  
+
 async function generateRandomUserId(name) {
     return `${name}_${Math.round(Math.random() * 10000)}`;
-  }
+}
 
 async function generateUUID() {
     function getRandomHexDigit() {
@@ -51,9 +55,9 @@ async function generateUUIDv7() {
     const timeHex = timestamp.toString(16).padStart(12, '0');
     const randomBits = crypto.randomBytes(8).toString('hex').slice(2);
     const uuid = [
-        timeHex.slice(0, 8), 
-        timeHex.slice(8) + randomBits.slice(0, 4), 
-        '7' + randomBits.slice(4, 7), 
+        timeHex.slice(0, 8),
+        timeHex.slice(8) + randomBits.slice(0, 4),
+        '7' + randomBits.slice(4, 7),
         (parseInt(randomBits.slice(7, 8), 16) & 0x3f | 0x80).toString(16) + randomBits.slice(8, 12),
         randomBits.slice(12)
     ];
@@ -61,17 +65,17 @@ async function generateUUIDv7() {
     return uuid.join('-');
 }
 
-const getWebhookUrl = async(user_id, event_name) => {
-    try{
-        const webhookUrl = (variableConfig.webhook_data.find(e=> e.user_id === user_id && e.event === event_name))?.webhook_url || false;
+const getWebhookUrl = async (user_id, event_name) => {
+    try {
+        const webhookUrl = (variableConfig.webhook_data.find(e => e.user_id === user_id && e.event === event_name))?.webhook_url || false;
         return webhookUrl;
-    }catch(err){
+    } catch (err) {
         return err;
     }
 }
 
-const getRollbackOptions = async(data)=> {
-    const { amount, txn_id, ip, game_id, user_id, game_code, secret, operatorUrl, token} = data;
+const getRollbackOptions = async (data) => {
+    const { amount, txn_id, ip, game_id, user_id, game_code, secret, operatorUrl, token } = data;
     const trx_id = generateUUIDv7();
     const description = `${amount} Rollback-ed for transaction with reference ID ${txn_id}`
     let encryptedData;
@@ -90,18 +94,52 @@ const getRollbackOptions = async(data)=> {
         timeout: 1000 * 3,
         data: { data: encryptedData }
     };
-    const dbData = { txn_id: trx_id, description, txn_ref_id: txn_id, txn_type: 2, amount, game_id, userId: user_id, token, operatorId: data.operatorId};
-    return {options: postOptions, dbData};
+    const dbData = { txn_id: trx_id, description, txn_ref_id: txn_id, txn_type: 2, amount, game_id, user_id, token, operatorId: data.operatorId };
+    return { options: postOptions, dbData };
 }
 
-const getCashoutOptions = async(data)=> {
-    const { amount, txn_id, txn_ref_id, ip, game_id, user_id, txn_type, game_code, secret, operatorUrl, token, description} = data;
-    let encryptedData;
+const getTransactionOptions = async (data) => {
+
+    const { amount, txn_id, txn_ref_id, ip, game_id, user_id, operatorId, txn_type, token, description } = data;
+    const game_code = (variableConfig.games_masters_list.find(e => e.game_id == game_id))?.game_code || null;
+
+    if (!game_code) {
+        return;
+    }
+
+    let validateUser;
+
     try {
-        encryptedData = await encryption({ amount, txn_id, txn_ref_id, description, txn_type, ip, game_id, user_id, game_code }, secret);
+        validateUser = JSON.parse(await getRedis(token));
     } catch (err) {
         return;
     }
+
+    if (!validateUser) {
+        return false;
+    }
+
+    const secret = validateUser.secret;
+    let encryptedData;
+
+    try {
+        encryptedData = await encryption({ amount, txn_id, txn_ref_id, description, txn_type, ip, game_id, user_id, game_code }, secret);
+    } catch (err) {
+        return err;
+    }
+
+    let operatorUrl;
+
+    try {
+        operatorUrl = await getWebhookUrl(operatorId, "UPDATE_BALANCE");
+    } catch (err) {
+        return;
+    }
+
+    if (!operatorUrl) {
+        return false;
+    }
+
     const postOptions = {
         method: 'POST',
         url: operatorUrl,
@@ -112,11 +150,85 @@ const getCashoutOptions = async(data)=> {
         timeout: 1000 * 3,
         data: { data: encryptedData }
     };
-    return {options: postOptions, dbData: data};
+
+    const dbData = { txn_id, description, txn_ref_id, txn_type, amount, game_id, user_id, token, operatorId, secret, operatorUrl, game_code, ip };
+    return { options: postOptions, dbData };
+}
+
+const getDebitTransaction = async (txn_ref_id) => {
+    const [debitTransaction] = await read(`SELECT * FROM transaction WHERE txn_id = ? LIMIT 1`, [txn_ref_id]);
+    return debitTransaction[0];
+}
+
+const getTransactionForRollback = async (data) => {
+    try {
+        const { amount, txn_id, txn_ref_id, ip, game_id, user_id, operator_id, txn_type, session_token, description } = data;
+        const game_code = (variableConfig.games_masters_list.find(e => e.game_id == game_id))?.game_code || null;
+        if (!game_code) {
+            return false;
+        }
+        const trx_id = await generateUUIDv7();
+        const trx_ref_id = txn_type == '0' ? txn_id : txn_ref_id;
+        const debitTransaction = txn_type == '1' ?  await getDebitTransaction(txn_ref_id): {};
+        let txn_decription = txn_type == '0' ? description : debitTransaction?.description;
+        txn_decription = txn_decription.replace('debited', 'rollback-ed');
+        const txn_amount = txn_type == '0' ? amount : debitTransaction?.amount;
+
+        let validateUser;
+
+        try {
+            validateUser = JSON.parse(await getRedis(session_token));
+        } catch (err) {
+            return;
+        }
+
+        if (!validateUser) {
+            return false;
+        }
+
+        const secret = validateUser.secret;
+        let encryptedData;
+
+        try {
+            encryptedData = await encryption({ amount: txn_amount, txn_id: trx_id, txn_ref_id: trx_ref_id, description: txn_decription, txn_type: 2, ip, game_id, user_id, game_code }, secret);
+        } catch (err) {
+            return err;
+        }
+
+        let operatorUrl;
+
+        try {
+            operatorUrl = await getWebhookUrl(operator_id, "UPDATE_BALANCE");
+        } catch (err) {
+            return;
+        }
+
+        if (!operatorUrl) {
+            return false;
+        }
+
+        const postOptions = {
+            method: 'POST',
+            url: operatorUrl,
+            headers: {
+                'Content-Type': 'application/json',
+                token: session_token
+            },
+            timeout: 1000 * 3,
+            data: { data: encryptedData }
+        };
+
+        const dbData = { txn_id: trx_id, description: txn_decription, txn_ref_id: trx_ref_id, txn_type: 2, amount: txn_amount, game_id, user_id, token: session_token, operatorId: operator_id };
+        return { options: postOptions, dbData };
+    } catch (err) {
+        console.log(err);
+        return false
+    }
+
 }
 
 
-const createOptions =(url, options)=>{
+const createOptions = (url, options) => {
     let token = options.token;
     let clientServerOptions = {
         url,
@@ -125,11 +237,30 @@ const createOptions =(url, options)=>{
             "Content-Type": "application/json",
             token
         },
-        data:{
+        data: {
             data: options
         }
     }
     return clientServerOptions
 }
 
-module.exports = { generateRandomString, generateRandomUserId, generateUUID , generateUUIDv7, getWebhookUrl, createOptions, getRollbackOptions, getCashoutOptions}
+
+async function storeHourlyStats() {
+    const url = 'https://stats.ayodhya365.co/aviator/mis/report';
+    const headers = {
+        //  'Authorization': 'Bearer YOUR_ACCESS_TOKEN',  // replace with actual token
+        'Content-Type': 'application/json'  // depends on the API requirements
+    };
+    const payload = {
+        data: variableConfig.games_masters_list.map((e) => ({ game_id: e.game_id, name: e.name.replace(' ', '_').toLowerCase() }))
+    };
+    try {
+        const response = await axios.post(url, payload, { headers });
+        return response.data;
+    } catch (error) {
+        console.error('Error fetching data:', error.message);
+        return null;
+    }
+}
+
+module.exports = { generateRandomString, generateRandomUserId, generateUUID, generateUUIDv7, getWebhookUrl, createOptions, getRollbackOptions, getTransactionOptions, storeHourlyStats, getTransactionForRollback }
