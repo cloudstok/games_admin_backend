@@ -2,14 +2,13 @@
 const { compare, hashPassword } = require('../../utilities/bcrypt')
 const { read, write } = require('../../utilities/db-connection')
 const { generateToken } = require('../../utilities/jsonwebtoken')
-const { generateRandomString, generateRandomUserId, generateUUID, generateUUIDv7 } = require('../../utilities/common_function')
+const { generateRandomString, generateRandomUserId, generateUUIDv7 } = require('../../utilities/common_function')
 const { decryption } = require('../../utilities/ecryption-decryption')
 const { setRedis, getRedis } = require('../../utilities/redis-connection')
 const { variableConfig, loadConfig } = require('../../utilities/load-config')
 const login = async (req, res) => {
   try {
     const { userId, password } = req.body
-    // const data = variableConfig.operator_data.find(e=> e.user_id === userId) || null;
     const data =[ ...variableConfig.user_credentials , ...variableConfig.operator_data].find(e=> e.user_id === userId) || null;
     if (data) {
       const checkPassword = await compare(password, data.password)

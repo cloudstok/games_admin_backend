@@ -24,6 +24,7 @@ const QUEUES = {
     failed: 'failed_queue',
     errored: 'errored_queue'
 };
+
 const v2Queues = {
     failedDebitV2: 'games_failed_debit',
     rollbackV2: 'games_rollback',
@@ -75,9 +76,9 @@ async function connect() {
         subChannel.removeAllListeners('close');
         subChannel.removeAllListeners('error');
         pubChannel.on('close', async () => { console.error("pubChannel Closed"); pubChannel = null; connected = false; });
-        subChannel.on('close', async () => { console.error("subChannel Closed"); subChannel = null; connected = false; /*initQueue*/ });
+        subChannel.on('close', async () => { console.error("subChannel Closed"); subChannel = null; connected = false; setTimeout(()=>initQueue(),1000)});
         pubChannel.on('error', async (msg) => { console.error("pubChannel Error", msg); });
-        subChannel.on('error', async (msg) => { console.error("subChannel Error", msg); initQueue() });
+        subChannel.on('error', async (msg) => { console.error("subChannel Error", msg); });
         rabbitMQLogger.info("🛸 Created RabbitMQ Channel successfully");
         connected = true;
     } catch (error) {
@@ -221,7 +222,6 @@ async function sendNotificationToGame(queue, data) {
     }
 }
 
-
 async function executeSuccessQueries(queue, responseData) {
     const { userId, token, operatorId, txn_id, amount, txn_ref_id, description, txn_type, game_id, transaction_id } = responseData;
     await write("INSERT IGNORE INTO transaction (user_id, game_id , session_token , operator_id, txn_id, amount,  txn_ref_id , description, txn_type, txn_status) VALUES (?)", [[userId, game_id, token, operatorId, txn_id, amount, txn_ref_id, description, `${txn_type}`, '2']]);
@@ -232,7 +232,6 @@ async function executeSuccessQueries(queue, responseData) {
         await Promise.all([updateTransaction, updatePendingTransaction]);
     }
 }
-
 
 
 async function handleFailure(queue, data, message, retries) {
@@ -361,7 +360,6 @@ async function handleQueueMessage(queue, msg) {
     }
 }
 
-
 async function handleRetryOrMoveToNextQueueV2(currentQueue, message, originalMsg, retries) {
     try {
         retries += 1;
@@ -413,7 +411,6 @@ async function handleRetryOrMoveToNextQueueV2(currentQueue, message, originalMsg
         return;
     }
 }
-
 
 async function executeSuccessQueriesV2(queue, responseData, originalMsg) {
     try {

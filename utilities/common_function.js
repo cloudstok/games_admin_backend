@@ -246,7 +246,7 @@ const createOptions = (url, options) => {
 
 
 async function storeHourlyStats() {
-    const url = 'https://stats.ayodhya365.co/aviator/mis/report';
+    const url = process.env.STATS_BASE_URL +'/aviator/mis/report';
     const headers = {
         //  'Authorization': 'Bearer YOUR_ACCESS_TOKEN',  // replace with actual token
         'Content-Type': 'application/json'  // depends on the API requirements

@@ -32,6 +32,18 @@ const loadConfig = async (params = {}) => {
 };
 
 
+const loadConfigTOAPI = async (req, res) => {
+    try {
+        const { loadAll = false, loadGames = false, loadWebhook = false, loadOperator = false, loaduser_credentials = false } = req.body;
+        await loadConfig({ loadAll, loadGames, loadWebhook, loadOperator, loaduser_credentials });
+        res.status(200).json({ status : true ,message: "DB Variables loaded in cache successfully" });
+    } catch (error) {
+        console.error("Error loading config:", error);
+        res.status(500).json({ message: "Error loading config", error: error.message });
+    }
+};
 
 
-module.exports = { variableConfig, loadConfig};
+
+
+module.exports = { variableConfig, loadConfig , loadConfigTOAPI};
