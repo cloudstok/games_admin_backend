@@ -35,8 +35,8 @@ const getransaction = async (req, res) => {
         }
 
         if (lobby_id) {
-            whereConditions.push('description like ?');
-            params.push('%'+lobby_id);
+            whereConditions.push('lobby_id = ?');
+            params.push(lobby_id);
         }
         if (whereConditions.length > 0) {
             sql += ' WHERE ' + whereConditions.join(' AND ');

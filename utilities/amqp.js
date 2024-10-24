@@ -1,7 +1,7 @@
 const client = require("amqplib");
 const axios = require('axios');
 const { write } = require("./db-connection");
-const { generateUUIDv7, getRollbackOptions, getTransactionOptions } = require("./common_function");
+const { generateUUIDv7, getRollbackOptions, getTransactionOptions, getLobbyFromDescription } = require("./common_function");
 const { encryption } = require("./ecryption-decryption");
 const createLogger = require('../utilities/logger');
 const { variableConfig } = require("./load-config");
@@ -224,7 +224,8 @@ async function sendNotificationToGame(queue, data) {
 
 async function executeSuccessQueries(queue, responseData) {
     const { userId, token, operatorId, txn_id, amount, txn_ref_id, description, txn_type, game_id, transaction_id } = responseData;
-    await write("INSERT IGNORE INTO transaction (user_id, game_id , session_token , operator_id, txn_id, amount,  txn_ref_id , description, txn_type, txn_status) VALUES (?)", [[userId, game_id, token, operatorId, txn_id, amount, txn_ref_id, description, `${txn_type}`, '2']]);
+    const lobby_id = description ? getLobbyFromDescription(description) : "";
+    await write("INSERT IGNORE INTO transaction (user_id, game_id , session_token , operator_id, txn_id, amount, lobby_id,  txn_ref_id , description, txn_type, txn_status) VALUES (?)", [[userId, game_id, token, operatorId, txn_id, amount, lobby_id, txn_ref_id, description, `${txn_type}`, '2']]);
     console.log(`Successful ${queue} transaction logged to db`);
     if (queue === QUEUES.rollback) {
         const updateTransaction = write(`UPDATE transaction SET txn_status = "0" WHERE txn_ref_id = ? and txn_type = '1'`, [txn_ref_id]);
@@ -244,11 +245,12 @@ async function handleFailure(queue, data, message, retries) {
 
 async function executeCashoutFailureQueries(data, message) {
     const { userId, token, operatorId, txn_id, amount, txn_ref_id, description, txn_type, game_id } = data;
+    const lobby_id = description ? getLobbyFromDescription(description) : "";
     if (data.txn_type === 0) {
         console.log('As Cashout queue is failed and transaction type is DEBIT retry is not permittted, inserting failed debit transaction');
-        await write("INSERT IGNORE INTO transaction (user_id,game_id, session_token , operator_id, txn_id, amount,  txn_ref_id , description, txn_type, txn_status) VALUES (?)", [[userId, game_id, token, operatorId, txn_id, amount, txn_ref_id, description, `${txn_type}`, '0']]);
+        await write("INSERT IGNORE INTO transaction (user_id,game_id, session_token , operator_id, txn_id, amount, lobby_id,  txn_ref_id , description, txn_type, txn_status) VALUES (?)", [[userId, game_id, token, operatorId, txn_id, amount, lobby_id, txn_ref_id, description, `${txn_type}`, '0']]);
     } else {
-        const [{ insertId }] = await write("INSERT IGNORE INTO transaction (user_id,game_id, session_token , operator_id, txn_id, amount,  txn_ref_id , description, txn_type, txn_status) VALUES (?)", [[userId, game_id, token, operatorId, txn_id, amount, txn_ref_id, description, `${txn_type}`, '1']]);
+        const [{ insertId }] = await write("INSERT IGNORE INTO transaction (user_id,game_id, session_token , operator_id, txn_id, amount, lobby_id,  txn_ref_id , description, txn_type, txn_status) VALUES (?)", [[userId, game_id, token, operatorId, txn_id, amount, lobby_id, txn_ref_id, description, `${txn_type}`, '1']]);
         await write("INSERT IGNORE INTO pending_transactions (transaction_id, game_id, options) VALUES (?)", [[insertId, game_id, JSON.stringify(message)]]);
         console.log('As Cashout queue is failed, inserting pending transaction for further future manual rollback or cashout retry');
         return insertId;
@@ -415,7 +417,8 @@ async function handleRetryOrMoveToNextQueueV2(currentQueue, message, originalMsg
 async function executeSuccessQueriesV2(queue, responseData, originalMsg) {
     try {
         const { user_id, token, operatorId, txn_id, amount, txn_ref_id, description, txn_type, game_id } = responseData;
-        await write("INSERT IGNORE INTO transaction (user_id, game_id , session_token , operator_id, txn_id, amount,  txn_ref_id , description, txn_type, txn_status) VALUES (?)", [[user_id, game_id, token, operatorId, txn_id, amount, txn_ref_id, description, `${txn_type}`, '2']]);
+        const lobby_id = description ? getLobbyFromDescription(description) : "";
+        await write("INSERT IGNORE INTO transaction (user_id, game_id , session_token , operator_id, txn_id, amount, lobby_id,  txn_ref_id , description, txn_type, txn_status) VALUES (?)", [[user_id, game_id, token, operatorId, txn_id, amount, lobby_id, txn_ref_id, description, `${txn_type}`, '2']]);
         console.log(`Successful ${queue} transaction logged to db`);
     } catch (err) {
         console.log(err);
@@ -427,7 +430,8 @@ async function executeSuccessQueriesV2(queue, responseData, originalMsg) {
 async function executeFailureQueriesV2(queue, data, originalMsg) {
     try {
         const { user_id, token, operatorId, txn_id, amount, txn_ref_id, description, txn_type, game_id } = data;
-        await write("INSERT IGNORE INTO transaction (user_id, game_id, session_token, operator_id, txn_id, amount,  txn_ref_id, description, txn_type, txn_status) VALUES (?)", [[user_id, game_id, token, operatorId, txn_id, amount, txn_ref_id, description, `${txn_type}`, '0']]);
+        const lobby_id = description ? getLobbyFromDescription(description) : "";
+        await write("INSERT IGNORE INTO transaction (user_id, game_id, session_token, operator_id, txn_id, amount, lobby_id, txn_ref_id, description, txn_type, txn_status) VALUES (?)", [[user_id, game_id, token, operatorId, txn_id, amount, lobby_id, txn_ref_id, description, `${txn_type}`, '0']]);
         console.log(`failed ${queue} transaction logged to db`);
     } catch (err) {
         console.log(err);

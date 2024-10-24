@@ -1,6 +1,6 @@
 const axios = require('axios');
 const { write } = require('../../utilities/db-connection');
-const { generateUUIDv7, getTransactionOptions, getTransactionForRollback } = require('../../utilities/common_function');
+const { generateUUIDv7, getTransactionOptions, getTransactionForRollback, getLobbyFromDescription } = require('../../utilities/common_function');
 const { encryption, decryption } = require('../../utilities/ecryption-decryption');
 const { variableConfig } = require('../../utilities/load-config');
 const createLogger = require('../../utilities/logger');
@@ -80,7 +80,8 @@ async function executeTransactionQuery(responseData, requestData) {
             console.log(`Transaction updated`);
         }else if(requestData.event == 'rollback'){
             const { user_id, token, operatorId, txn_id, amount, txn_ref_id, description, txn_type, game_id } = responseData;
-            await write("INSERT INTO transaction (user_id, game_id , session_token , operator_id, txn_id, amount,  txn_ref_id , description, txn_type, txn_status) VALUES (?)", [[user_id, game_id, token, operatorId, txn_id, amount, txn_ref_id, description, `${txn_type}`, '2']]);
+            const lobby_id = description ? getLobbyFromDescription(description) : "";
+            await write("INSERT INTO transaction (user_id, game_id , session_token , operator_id, txn_id, amount, lobby_id, txn_ref_id , description, txn_type, txn_status) VALUES (?)", [[user_id, game_id, token, operatorId, txn_id, amount, lobby_id, txn_ref_id, description, `${txn_type}`, '2']]);
             console.log(`transaction logged to db`);
         }
         return;
@@ -157,7 +158,8 @@ const operatorRollback = async (req, res) => {
 };
 
 const insertRollbackData = async(userId, token, operatorId, transactionId, rollbackAmount, txn_ref_id, description, game_id) => {
-    await write(`INSERT IGNORE INTO transaction (user_id, game_id, session_token, operator_id, txn_id, amount, txn_ref_id, description, txn_type, txn_status) VALUES (?)`, [[userId, game_id, token, operatorId, transactionId, rollbackAmount, txn_ref_id, description, '2', '2']])
+    const lobby_id = description ? getLobbyFromDescription(description) : "";
+    await write(`INSERT IGNORE INTO transaction (user_id, game_id, session_token, operator_id, txn_id, amount, lobby_id, txn_ref_id, description, txn_type, txn_status) VALUES (?)`, [[userId, game_id, token, operatorId, transactionId, rollbackAmount, lobby_id, txn_ref_id, description, '2', '2']])
 }
 
 

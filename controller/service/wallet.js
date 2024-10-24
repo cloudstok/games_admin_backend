@@ -2,7 +2,7 @@ const axios = require('axios');
 const { getRedis } = require('../../utilities/redis-connection');
 const { encryption } = require('../../utilities/ecryption-decryption');
 const { write, read } = require('../../utilities/db-connection');
-const { getWebhookUrl, generateUUIDv7 } = require('../../utilities/common_function');
+const { getWebhookUrl, generateUUIDv7, getLobbyFromDescription } = require('../../utilities/common_function');
 const { sendToQueue } = require('../../utilities/amqp');
 const getLogger = require('../../utilities/logger');
 const { variableConfig } = require('../../utilities/load-config');
@@ -159,6 +159,7 @@ const updateUserBalanceV2 = async (req, res) => {
         return res.status(400).send({ status: false, msg: "Missing token in headers"});
     }
     const { txn_id, amount, description, txn_type, ip, game_id, user_id } = req.body;
+    const lobby_id = description ? getLobbyFromDescription(description) : "";
     let game_code = (variableConfig.games_masters_list.find(e=> e.game_id == game_id))?.game_code || null;
     if(!game_code){
         return res.status(400).send({ status: false, msg: "No game code is available for the game"});
@@ -224,11 +225,11 @@ const updateUserBalanceV2 = async (req, res) => {
         const response = await axios(options);
         //Inserting Success queries to Database
         thirdPartyLogger.info(JSON.stringify({ req: logDataReq, res: response?.data}));
-        await write("INSERT IGNORE INTO transaction (user_id, game_id, session_token, operator_id, txn_id, amount, description, txn_type, txn_status) VALUES (?)", [[userId, game_id, token, operatorId, txn_id, amount, description, `${txn_type}`, '2']]);
+        await write("INSERT IGNORE INTO transaction (user_id, game_id, session_token, operator_id, txn_id, amount, lobby_id, description, txn_type, txn_status) VALUES (?)", [[userId, game_id, token, operatorId, txn_id, amount, lobby_id, description, `${txn_type}`, '2']]);
         return res.status(200).send({ status: true, msg: 'Balance updated successfully'});
     }catch(err){
         failedThirdPartyLogger.info(JSON.stringify({ req: logDataReq, res: err?.response?.data, statusCode: err?.response?.status}));
-        await write("INSERT IGNORE INTO transaction (user_id, game_id, session_token, operator_id, txn_id, amount, description, txn_type, txn_status) VALUES (?)", [[userId, game_id, token, operatorId, txn_id, amount, description, `${txn_type}`, '0']]);
+        await write("INSERT IGNORE INTO transaction (user_id, game_id, session_token, operator_id, txn_id, amount, lobby_id, description, txn_type, txn_status) VALUES (?)", [[userId, game_id, token, operatorId, txn_id, amount, lobby_id, description, `${txn_type}`, '0']]);
         await sendToQueue('', 'games_rollback', JSON.stringify({...req.body, token, game_code, operatorUrl, secret, operatorId}), 100);
         return res.status(500).send({ status: false, msg: "Internal Server error" });
     }

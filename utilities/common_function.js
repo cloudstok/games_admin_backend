@@ -3,7 +3,7 @@ const { variableConfig } = require('./load-config');
 const { getRedis } = require('./redis-connection');
 const { encryption } = require('./ecryption-decryption');
 const axios = require('axios');
-const { write, read } = require('./db-connection');
+const { read } = require('./db-connection');
 async function generateRandomString(length) {
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     let randomString = "";
@@ -261,6 +261,11 @@ async function storeHourlyStats() {
         console.error('Error fetching data:', error.message);
         return null;
     }
+};
+
+const getLobbyFromDescription = (line) => {
+    const parts = line.trim().split(' ');
+    return parts[parts.length - 1];
 }
 
-module.exports = { generateRandomString, generateRandomUserId, generateUUID, generateUUIDv7, getWebhookUrl, createOptions, getRollbackOptions, getTransactionOptions, storeHourlyStats, getTransactionForRollback }
+module.exports = { generateRandomString, generateRandomUserId, generateUUID, generateUUIDv7, getWebhookUrl, createOptions, getRollbackOptions, getTransactionOptions, storeHourlyStats, getTransactionForRollback, getLobbyFromDescription }
