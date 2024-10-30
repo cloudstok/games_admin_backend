@@ -1,5 +1,5 @@
 //const { addGame, findGame } = require('../controller/service/game');
-const { register, login, userLogin, getOperatorList } = require('../controller/service/operator');
+const { register, login, userLogin, getOperatorList, updateGameStatus, updateOperatorDetails, updateOperatorStatus } = require('../controller/service/operator');
 const { serviceAddGame, getOperatorGame, getMasterListGames, getOperatorGamesForService, addGameForOperator, getGameURL } = require('../controller/service/game');
 const { getUserBalance, updateUserBalance, updateUserBalanceV2 } = require('../controller/service/wallet');
 const { verifyToken, auth } = require('../utilities/jsonwebtoken');
@@ -8,13 +8,16 @@ const { getransaction, rollbacklist } = require('../controller/service/transacti
 const serviceRouter = require('express').Router();
 const { add_webhook, get_webhook, webhook, update_webhook_url } = require('../controller/service/webhook');
 const { bets, retryTransaction, operatorRollback, report } = require('../controller/service/bets');
-const { addAgent, agentList, agentChangePassword, deleteAgent } = require('../controller/service/agent');
+const { addAgent, agentList, agentChangePassword, deleteAgent, resetAgentPassword } = require('../controller/service/agent');
 const { addAdmin, adminList, adminChangePassword, deleteAdmin } = require('../controller/service/admin');
 const { loadConfigTOAPI } = require('../utilities/load-config');
 
 
 //Service Panel routes
 serviceRouter.post('/register/user', verifyToken,  auth(['admin' , 'operator', 'superadmin']) , register);
+serviceRouter.post('/update/operator', verifyToken,  auth(['admin', 'superadmin']) , updateOperatorDetails);
+serviceRouter.post('/operator/updatestatus', verifyToken,  auth(['admin', 'superadmin']) , updateOperatorStatus);
+serviceRouter.post('/updategamestatus', verifyToken,  auth(['admin', 'superadmin']), updateGameStatus);
 serviceRouter.post('/user/login', login);
 serviceRouter.get('/active/user', activeUser);
 serviceRouter.get('/operators/list', verifyToken, auth(['admin' , 'agent', 'superadmin']), getOperatorList);
@@ -60,10 +63,11 @@ serviceRouter.post('/account/user/change/password', auth(['agent' , 'admin', 'su
 
 
 // add agent
-serviceRouter.post('/agent' ,auth(['admin' , 'superadmin']) , addAgent)
-serviceRouter.get('/agent'  ,auth(['admin', 'superadmin']) , agentList)
-serviceRouter.delete('/agent'  ,auth(['admin', 'superadmin']) , deleteAgent)
-serviceRouter.post('/agent/change/password', auth(['agent' , 'admin', 'superadmin'])   , agentChangePassword)
+serviceRouter.post('/agent', auth(['admin' , 'superadmin']), addAgent)
+serviceRouter.get('/agent', auth(['admin', 'superadmin']), agentList)
+serviceRouter.delete('/agent', auth(['admin', 'superadmin']), deleteAgent)
+serviceRouter.post('/agent/change/password', auth(['agent' , 'admin', 'superadmin']), agentChangePassword);
+serviceRouter.post('/agent/reset/password', verifyToken, auth(['admin', 'superadmin']), resetAgentPassword);
 // reporte 
 serviceRouter.get('/mis/report', auth(['admin', 'superadmin']) , report)
 

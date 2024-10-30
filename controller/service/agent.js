@@ -62,6 +62,21 @@ const agentChangePassword = async (req, res) => {
     }
   };
 
+  const resetAgentPassword = async (req, res) => {
+    try {
+      const {user_id, password} = req.body;
+      const getUser = variableConfig.user_credentials.find(e=> e.user_id === user_id) || null
+      if (!getUser) return res.status(404).send({ status: false, msg: "Agent not found" });
+      const hashedPassword = await hashPassword(password);
+      await write("UPDATE user_credentials SET password = ? WHERE user_id = ?", [hashedPassword, user_id]);
+      await loadConfig({ loaduser_credentials: true});
+      return res.status(200).send({ status: true, msg: "Password updated successfully", password });
+    } catch (error) {
+      console.error(error); 
+      return res.status(500).send({ status: false, msg: "Internal Server Error" });
+    }
+  };
+
 
 const deleteAgent = async (req, res) => {
     try {
@@ -89,5 +104,5 @@ const deleteAgent = async (req, res) => {
 
 
 
-module.exports = {   agentList  , addAgent , agentChangePassword , deleteAgent}
+module.exports = {   agentList  , addAgent , agentChangePassword , deleteAgent, resetAgentPassword}
 

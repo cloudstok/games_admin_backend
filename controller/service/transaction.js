@@ -2,12 +2,14 @@ const { read } = require("../../utilities/db-connection");
 
 const getransaction = async (req, res) => {
     try {
-        let { limit = 100, offset = 0, user_id, operator_id, game_id , txn_id, txn_ref_id, lobby_id} = req.query;
+        let { limit = 100, offset = 0, user_id, operator_id, game_id , txn_id, txn_ref_id, lobby_id, type, start_date, end_date} = req.query;
         limit = parseInt(limit);
         offset = parseInt(offset);
         if (isNaN(limit) || isNaN(offset)) {
             return res.status(400).send({ status: false, msg: "Invalid limit or offset" });
         }
+        if((start_date && !end_date) || (!start_date && end_date)) return res.status(400).send({ status: false, msg: 'Both Start and End time is required to invoke date filter'});
+
         let sql = 'SELECT * FROM transaction';
         const params = [];
         let whereConditions = [];
@@ -38,6 +40,19 @@ const getransaction = async (req, res) => {
             whereConditions.push('lobby_id = ?');
             params.push(lobby_id);
         }
+
+        if (type) {
+            whereConditions.push('txn_type = ?');
+            params.push(type);
+        }
+
+        if(start_date && end_date) {
+            start_date = new Date(start_date).toISOString().slice(0, -5).replace('T', ' ');
+            end_date = new Date(end_date).toISOString().slice(0, -5).replace('T', ' ');
+            whereConditions.push(`created_at >= ? AND created_at <= ?`); 
+            params.push(start_date, end_date)
+        };
+
         if (whereConditions.length > 0) {
             sql += ' WHERE ' + whereConditions.join(' AND ');
         }

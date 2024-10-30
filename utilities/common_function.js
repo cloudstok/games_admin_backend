@@ -246,10 +246,9 @@ const createOptions = (url, options) => {
 
 
 async function storeHourlyStats() {
-    const url = process.env.STATS_BASE_URL +'/aviator/mis/report';
+    const url = process.env.STATS_BASE_URL + '/games/mis/report';
     const headers = {
-        //  'Authorization': 'Bearer YOUR_ACCESS_TOKEN',  // replace with actual token
-        'Content-Type': 'application/json'  // depends on the API requirements
+        'Content-Type': 'application/json' 
     };
     const payload = {
         data: variableConfig.games_masters_list.map((e) => ({ game_id: e.game_id, name: e.name.replace(' ', '_').toLowerCase() }))
