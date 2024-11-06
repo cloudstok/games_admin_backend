@@ -1,7 +1,7 @@
 const client = require("amqplib");
 const axios = require('axios');
 const { write } = require("./db-connection");
-const { generateUUIDv7 } = require("./common_function");
+const { generateUUIDv7, getRollbackOptions, getTransactionOptions, getLobbyFromDescription } = require("./common_function");
 const { encryption } = require("./ecryption-decryption");
 const createLogger = require('../utilities/logger');
 const { variableConfig } = require("./load-config");
@@ -10,6 +10,8 @@ const failedThirdPartyLogger = createLogger('Failed_Third_Party_Data', 'jsonl');
 const gameNotificationLogger = createLogger('Game_Notification', 'jsonl');
 const failedGameNotificationLogger = createLogger('Failed_Game_Notification', 'jsonl');
 const rabbitMQLogger = createLogger('Queue');
+const logger = createLogger('Consumer');
+const exchange = process.env.AMQP_EXCHANGE_NAME;
 
 let pubChannel, subChannel = null;
 let connected = false;
@@ -22,8 +24,40 @@ const QUEUES = {
     failed: 'failed_queue',
     errored: 'errored_queue'
 };
+
+const v2Queues = {
+    failedDebitV2: 'games_failed_debit',
+    rollbackV2: 'games_rollback',
+    cashoutV2: 'games_cashout',
+    failedV2: 'games_failed',
+    erroredV2: 'games_errored'
+};
 const { AMQP_CONNECTION_STRING } = process.env;
 
+async function initQueue() {
+    await connect();
+    const Queues = {
+        debit: 'debit_queue',
+        cashout: 'cashout_queue',
+        rollback: 'rollback_queue',
+        failed: 'failed_queue',
+        errored: 'errored_queue'
+    };
+    const v2Queues = {
+        failedDebitV2: 'games_failed_debit',
+        rollbackV2: 'games_rollback',
+        cashoutV2: 'games_cashout',
+        failedV2: 'games_failed',
+        erroredV2: 'games_errored'
+    };
+    for (const queue of Object.values(Queues)) {
+        await consumeQueue(queue, handleMessage);
+    }
+    for (const queue of Object.values(v2Queues)) {
+        await consumeQueue(queue, handleQueueMessage);
+    }
+    logger.info('RabbitMQ queues are being consumed');
+}
 
 async function connect() {
     if (connected && pubChannel && subChannel) return;
@@ -35,10 +69,16 @@ async function connect() {
             connection.createChannel(),
             connection.createChannel()
         ]);
-        pubChannel.on('close',async ()=>{ console.error("pubChannel Closed") ;  pubChannel = null; });
-        subChannel.on('close',async ()=>{ console.error("subChannel Closed") ;  subChannel = null; });
-        pubChannel.on('error',async (msg)=>{ console.error("pubChannel Error" , msg); });
-        subChannel.on('error',async (msg)=>{ console.error("subChannel Error" , msg); });
+        await pubChannel.assertExchange(exchange, "x-delayed-message", { autoDelete: false, durable: true,  
+            arguments: { "x-delayed-type": "direct" } });    
+        pubChannel.removeAllListeners('close');
+        pubChannel.removeAllListeners('error');
+        subChannel.removeAllListeners('close');
+        subChannel.removeAllListeners('error');
+        pubChannel.on('close', async () => { console.error("pubChannel Closed"); pubChannel = null; connected = false; });
+        subChannel.on('close', async () => { console.error("subChannel Closed"); subChannel = null; connected = false; setTimeout(()=>initQueue(),1000)});
+        pubChannel.on('error', async (msg) => { console.error("pubChannel Error", msg); });
+        subChannel.on('error', async (msg) => { console.error("subChannel Error", msg); });
         rabbitMQLogger.info("🛸 Created RabbitMQ Channel successfully");
         connected = true;
     } catch (error) {
@@ -47,17 +87,19 @@ async function connect() {
     }
 }
 
-async function sendToQueue(exchange, queueName, message, delay = 0, retries = 0) {
+async function sendToQueue(ex, queueName, message, delay = 0, retries = 0) {
     try {
-        if (!pubChannel) {
+        if (!pubChannel || pubChannel.connection._closing) {
             await connect();
         }
         await pubChannel.assertQueue(queueName, { durable: true });
+        await pubChannel.bindQueue(queueName, exchange, queueName); // This is done for simplicity .
         pubChannel.publish(exchange, queueName, Buffer.from(message), {
             headers: { "x-delay": delay, "x-retries": retries }, persistent: true
         });
         rabbitMQLogger.info(`Message sent to ${queueName} queue on exchange ${exchange}`);
     } catch (error) {
+        console.log(error);
         rabbitMQLogger.error(`Failed to send message to ${queueName} queue on exchange ${exchange}: ${error.message}`);
         throw error;
     }
@@ -69,14 +111,14 @@ async function consumeQueue(queue, handler) {
         await subChannel.assertQueue(queue, { durable: true });
         rabbitMQLogger.info(`Creating consumer for ${queue}`);
         await subChannel.consume(queue, async (msg) => {
-            if (!msg) throw ({message:"Invalid incoming message for queue "});
+            if (!msg) throw ({ message: "Invalid incoming message for queue " });
             try {
                 await handler(queue, msg);
             } catch (error) {
                 rabbitMQLogger.error(`Handler error for ${queue}: ${error.message}`);
                 subChannel.nack(msg);
             }
-        }, { noAck: true });
+        }, { noAck: false });
     } catch (error) {
         rabbitMQLogger.error(`Queue processing error: ${error.message}`);
         throw error;
@@ -84,60 +126,65 @@ async function consumeQueue(queue, handler) {
 }
 
 async function handleMessage(queue, msg) {
-    let logId = await generateUUIDv7()
-    const message = JSON.parse(msg.content.toString());
-    let logDataReq = {logId, message};
-    let retries = msg.properties.headers['x-retries'] || 0;
-    let dbData = message.db_data;
-    delete message.db_data;
-
-    if (queue === QUEUES.failed) {
-        await sendNotificationToGame(queue, dbData);
-        console.error(`Message permanently failed in ${queue}: ${JSON.stringify(message)}`);
-        subChannel.ack(msg);
-        return;
-    }
-
-    if (queue === QUEUES.errored) {
-        console.error(`Message encountered an error in ${queue}: ${JSON.stringify(message)}`);
-        subChannel.ack(msg);
-        return;
-    }
-
     try {
-        const response = await axios(message);
-        if (response?.status === 200) {
-            thirdPartyLogger.info(JSON.stringify({ req: logDataReq, res: response?.data}));
-            console.log(`Request succeeded for ${queue}:`, response.data);
-            if (queue === QUEUES.rollback) await sendNotificationToGame(queue, dbData);
-            await executeSuccessQueries(queue, dbData);
+        let logId = await generateUUIDv7()
+        const message = JSON.parse(msg.content.toString());
+        let logDataReq = { logId, message };
+        let retries = msg.properties.headers['x-retries'] || 0;
+        let dbData = message.db_data;
+        delete message.db_data;
+
+        if (queue === QUEUES.failed) {
+            await sendNotificationToGame(queue, dbData);
+            console.error(`Message permanently failed in ${queue}: ${JSON.stringify(message)}`);
             subChannel.ack(msg);
-        } else {
-            console.error(`Request failed for ${queue}: ${response.status}`);
-            failedThirdPartyLogger.error(JSON.stringify({ req: logDataReq, res: response?.data}));
+            return;
+        }
+
+        if (queue === QUEUES.errored) {
+            console.error(`Message encountered an error in ${queue}: ${JSON.stringify(message)}`);
+            subChannel.ack(msg);
+            return;
+        }
+
+        try {
+            const response = await axios(message);
+            if (response?.status === 200) {
+                thirdPartyLogger.info(JSON.stringify({ req: logDataReq, res: response?.data }));
+                console.log(`Request succeeded for ${queue}:`, response.data);
+                if (queue === QUEUES.rollback) await sendNotificationToGame(queue, dbData);
+                await executeSuccessQueries(queue, dbData);
+                subChannel.ack(msg);
+            } else {
+                console.error(`Request failed for ${queue}: ${response.status}`);
+                failedThirdPartyLogger.error(JSON.stringify({ req: logDataReq, res: response?.data }));
+                const insertId = await handleFailure(queue, dbData, message, retries);
+                if (insertId) {
+                    dbData.transaction_id = insertId
+                }
+                await handleRetryOrMoveToNextQueue(queue, message, msg, retries, dbData);
+            }
+        } catch (error) {
+            let response = error.response ? error.response.data : error;
+            failedThirdPartyLogger.error(JSON.stringify({ req: logDataReq, res: response }));
+            console.error(`Request failed for ${queue}: ${error.message}`);
             const insertId = await handleFailure(queue, dbData, message, retries);
             if (insertId) {
                 dbData.transaction_id = insertId
             }
             await handleRetryOrMoveToNextQueue(queue, message, msg, retries, dbData);
         }
-    } catch (error) {
-        let response = error.response ? error.response.data : error;
-        failedThirdPartyLogger.error(JSON.stringify({ req: logDataReq, res: response}));
-        console.error(`Request failed for ${queue}: ${error.message}`);
-        const insertId = await handleFailure(queue, dbData, message, retries);
-        if (insertId) {
-            dbData.transaction_id = insertId
-        }
-        await handleRetryOrMoveToNextQueue(queue, message, msg, retries, dbData);
+    } catch (err) {
+        subChannel.ack(msg);
+        return;
     }
 }
 
 async function sendNotificationToGame(queue, data) {
     let logId = await generateUUIDv7();
     let { operatorId, userId, amount, game_id, debit_description, socket_id, bet_id, txn_type, token } = data;
-    let backend_base_url = (variableConfig.games_masters_list.find(e=> e.game_id == game_id))?.backend_base_url || null;
-    if(!backend_base_url){
+    let backend_base_url = (variableConfig.games_masters_list.find(e => e.game_id == game_id))?.backend_base_url || null;
+    if (!backend_base_url) {
         console.log(`[Error] Unable to get the Backend Base URL for the given game id`);
         return;
     }
@@ -158,35 +205,34 @@ async function sendNotificationToGame(queue, data) {
         },
         data: postData
     };
-    let logDataReq = {logId, options};
+    let logDataReq = { logId, options };
     try {
         const data = await axios(options);
         if (data.status === 200) {
-            gameNotificationLogger.info(JSON.stringify({ req: logDataReq, res: data?.data}));
+            gameNotificationLogger.info(JSON.stringify({ req: logDataReq, res: data?.data }));
             console.log(`[SUCCESS] Response from game for ${queue} event is:::`, JSON.stringify(data.data));
         } else {
-            failedGameNotificationLogger.error(JSON.stringify({ req: logDataReq, res: data?.data}));
+            failedGameNotificationLogger.error(JSON.stringify({ req: logDataReq, res: data?.data }));
             console.log(`[Error] Response from game for ${queue} event is:::`, JSON.stringify(data.data));
         }
     } catch (error) {
         let response = error.response ? error.response.data : error;
-        failedGameNotificationLogger.error(JSON.stringify({ req: logDataReq, res: response}));
+        failedGameNotificationLogger.error(JSON.stringify({ req: logDataReq, res: response }));
         console.error(`[Error] Response from game for ${queue} event is:::`, JSON.stringify(error?.response?.data));
     }
 }
 
-
 async function executeSuccessQueries(queue, responseData) {
     const { userId, token, operatorId, txn_id, amount, txn_ref_id, description, txn_type, game_id, transaction_id } = responseData;
-    await write("INSERT IGNORE INTO transaction (user_id, game_id , session_token , operator_id, txn_id, amount,  txn_ref_id , description, txn_type, txn_status) VALUES (?)", [[userId, game_id, token, operatorId, txn_id, amount, txn_ref_id, description, `${txn_type}`, '2']]);
+    const lobby_id = description ? getLobbyFromDescription(description) : "";
+    await write("INSERT IGNORE INTO transaction (user_id, game_id , session_token , operator_id, txn_id, amount, lobby_id,  txn_ref_id , description, txn_type, txn_status) VALUES (?)", [[userId, game_id, token, operatorId, txn_id, amount, lobby_id, txn_ref_id, description, `${txn_type}`, '2']]);
     console.log(`Successful ${queue} transaction logged to db`);
     if (queue === QUEUES.rollback) {
         const updateTransaction = write(`UPDATE transaction SET txn_status = "0" WHERE txn_ref_id = ? and txn_type = '1'`, [txn_ref_id]);
-        const updatePendingTransaction = write(`UPDATE pending_transaction SET event = 'rollback', txn_status = '0' WHERE transaction_id = ?`, [transaction_id]);
+        const updatePendingTransaction = write(`UPDATE pending_transactions SET event = 'rollback', txn_status = '0' WHERE transaction_id = ?`, [transaction_id]);
         await Promise.all([updateTransaction, updatePendingTransaction]);
     }
 }
-
 
 
 async function handleFailure(queue, data, message, retries) {
@@ -199,17 +245,17 @@ async function handleFailure(queue, data, message, retries) {
 
 async function executeCashoutFailureQueries(data, message) {
     const { userId, token, operatorId, txn_id, amount, txn_ref_id, description, txn_type, game_id } = data;
-    if(data.txn_type === 0){
+    const lobby_id = description ? getLobbyFromDescription(description) : "";
+    if (data.txn_type === 0) {
         console.log('As Cashout queue is failed and transaction type is DEBIT retry is not permittted, inserting failed debit transaction');
-        await write("INSERT IGNORE INTO transaction (user_id,game_id, session_token , operator_id, txn_id, amount,  txn_ref_id , description, txn_type, txn_status) VALUES (?)", [[userId, game_id, token, operatorId, txn_id, amount, txn_ref_id, description, `${txn_type}`, '0']]);
-    }else{
-        const [{ insertId }] = await write("INSERT IGNORE INTO transaction (user_id,game_id, session_token , operator_id, txn_id, amount,  txn_ref_id , description, txn_type, txn_status) VALUES (?)", [[userId, game_id, token, operatorId, txn_id, amount, txn_ref_id, description, `${txn_type}`, '1']]);
+        await write("INSERT IGNORE INTO transaction (user_id,game_id, session_token , operator_id, txn_id, amount, lobby_id,  txn_ref_id , description, txn_type, txn_status) VALUES (?)", [[userId, game_id, token, operatorId, txn_id, amount, lobby_id, txn_ref_id, description, `${txn_type}`, '0']]);
+    } else {
+        const [{ insertId }] = await write("INSERT IGNORE INTO transaction (user_id,game_id, session_token , operator_id, txn_id, amount, lobby_id,  txn_ref_id , description, txn_type, txn_status) VALUES (?)", [[userId, game_id, token, operatorId, txn_id, amount, lobby_id, txn_ref_id, description, `${txn_type}`, '1']]);
         await write("INSERT IGNORE INTO pending_transactions (transaction_id, game_id, options) VALUES (?)", [[insertId, game_id, JSON.stringify(message)]]);
         console.log('As Cashout queue is failed, inserting pending transaction for further future manual rollback or cashout retry');
         return insertId;
     }
 }
-
 
 async function handleRetryOrMoveToNextQueue(currentQueue, message, originalMsg, retries, dbData) {
 
@@ -223,9 +269,9 @@ async function handleRetryOrMoveToNextQueue(currentQueue, message, originalMsg, 
             return;
         }
         let rollbackData = {
-            txn_id, amount: getRollbackTransaction[0].amount, txn_ref_id: dbData.txn_ref_id, description: `${getRollbackTransaction[0].amount} Rollback-ed for transaction with reference ID ${dbData.txn_ref_id}`, txn_type: 2
+            txn_id, user_id: dbData.userId, amount: getRollbackTransaction[0].amount, txn_ref_id: dbData.txn_ref_id, description: `${getRollbackTransaction[0].amount} Rollback-ed for transaction with reference ID ${dbData.txn_ref_id}`, txn_type: 2
         }
-        const operator = (variableConfig.operator_data.find(e=> e.user_id === dbData.operatorId)) || null;
+        const operator = (variableConfig.operator_data.find(e => e.user_id === dbData.operatorId)) || null;
         message.data.data = await encryption(rollbackData, operator.secret);
         dbData.debit_description = getRollbackTransaction[0].description
         for (const key in rollbackData) {
@@ -236,10 +282,10 @@ async function handleRetryOrMoveToNextQueue(currentQueue, message, originalMsg, 
     }
 
     if (currentQueue === QUEUES.debit) {
-        console.error(`As DEBIT event is failed in queue ${currentQueue}, initiated failed bet request to the game`);
         await sendNotificationToGame(currentQueue, dbData);
-        subChannel.ack(originalMsg);
-        return;
+        retries = MAX_RETRIES;
+        // subChannel.ack(originalMsg);
+        // return;
     }
 
     message.db_data = dbData;
@@ -258,7 +304,7 @@ async function handleRetryOrMoveToNextQueue(currentQueue, message, originalMsg, 
             }
         }, RETRY_DELAY_MS);
     } else {
-        const nextQueue = currentQueue === QUEUES.cashout ? QUEUES.rollback : QUEUES.failed;
+        const nextQueue = (currentQueue === QUEUES.cashout || currentQueue === QUEUES.debit) ? QUEUES.rollback : QUEUES.failed;
         console.log(`Moving message from ${currentQueue} to ${nextQueue}`);
         retries = 0;
         try {
@@ -271,9 +317,131 @@ async function handleRetryOrMoveToNextQueue(currentQueue, message, originalMsg, 
     }
 }
 
+//V2 Queues Handler
+async function handleQueueMessage(queue, msg) {
+    try {
+        let logId = await generateUUIDv7();
+        const message = JSON.parse(msg.content.toString());
+        const logReqObj = { logId, message };
+        const retries = msg.properties.headers['x-retries'] || 0;
+
+        if (queue == v2Queues.failedV2) {
+            console.error(`Message permanently failed in ${queue}: ${JSON.stringify(message)}`);
+            subChannel.ack(msg);
+            return;
+        }
+
+        if (queue === v2Queues.erroredV2) {
+            console.error(`Message encountered an error in ${queue}: ${JSON.stringify(message)}`);
+            subChannel.ack(msg);
+            return;
+        }
+
+        let postData;
+        if (queue == v2Queues.rollbackV2 && retries == 0) postData = await getRollbackOptions(message);
+        if (queue == v2Queues.cashoutV2 && retries == 0) postData = await getTransactionOptions(message);
+        else postData = message;
+        try {
+            const response = await axios(postData.options);
+            if (response.status == 200) {
+                thirdPartyLogger.info(JSON.stringify({ req: logReqObj, res: response?.data }));
+                console.log(`Request succeeded for ${queue}:`, response.data);
+                await executeSuccessQueriesV2(queue, postData.dbData, msg);
+                subChannel.ack(msg);
+            }
+        } catch (err) {
+            failedThirdPartyLogger.info(JSON.stringify({ req: logReqObj, res: err?.response?.status}))
+            if (err?.response?.status == 404 && queue == v2Queues.rollbackV2) {
+                thirdPartyLogger.info(JSON.stringify({ req: logReqObj, res: err?.response?.status }));
+                subChannel.ack(msg);
+            } else await handleRetryOrMoveToNextQueueV2(queue, postData, msg, retries);
+        }
+    } catch (err) {
+        subChannel.ack(msg);
+        return;
+    }
+}
+
+async function handleRetryOrMoveToNextQueueV2(currentQueue, message, originalMsg, retries) {
+    try {
+        retries += 1;
+
+        if (currentQueue == v2Queues.cashoutV2 && retries > MAX_RETRIES) {
+            await executeFailureQueriesV2(currentQueue, message.dbData, originalMsg);
+            const [getRollbackTransaction] = await write(`SELECT * FROM transaction WHERE txn_id = ?`, [message.dbData.txn_ref_id]);
+            const { ip, game_id, user_id, game_code, secret, operatorUrl, token, operatorId } = message.dbData;
+            let rollBackData =
+            {
+                amount: getRollbackTransaction[0].amount,
+                txn_id: getRollbackTransaction[0].txn_id,
+                ip,
+                game_id,
+                user_id,
+                game_code,
+                secret,
+                operatorUrl,
+                token,
+                operatorId
+            };
+            message = rollBackData;
+        }
+
+        if (retries <= MAX_RETRIES) {
+            console.log(`Retrying message in ${currentQueue} (retry #${retries})`);
+                try {
+                    await sendToQueue('', currentQueue, JSON.stringify(message), RETRY_DELAY_MS*(retries+1), retries);
+                    subChannel.ack(originalMsg);
+                } catch (error) {
+                    console.error(`Failed to retry message in ${currentQueue}: ${error.message}`);
+                    subChannel.nack(originalMsg);
+                }
+        } else {
+            const nextQueue = currentQueue === v2Queues.cashoutV2 ? v2Queues.rollbackV2 : v2Queues.failedV2;
+            console.log(`Moving message from ${currentQueue} to ${nextQueue}`);
+            retries = 0;
+            try {
+                await sendToQueue('', nextQueue, JSON.stringify(message), RETRY_DELAY_MS*(retries+1), retries);
+                subChannel.ack(originalMsg);
+            } catch (error) {
+                console.error(`Failed to move message from ${currentQueue} to ${nextQueue}: ${error.message}`);
+                subChannel.nack(originalMsg);
+            }
+        }
+    } catch (err) {
+        console.log(err);
+        subChannel.ack(originalMsg);
+        return;
+    }
+}
+
+async function executeSuccessQueriesV2(queue, responseData, originalMsg) {
+    try {
+        const { user_id, token, operatorId, txn_id, amount, txn_ref_id, description, txn_type, game_id } = responseData;
+        const lobby_id = description ? getLobbyFromDescription(description) : "";
+        await write("INSERT IGNORE INTO transaction (user_id, game_id , session_token , operator_id, txn_id, amount, lobby_id,  txn_ref_id , description, txn_type, txn_status) VALUES (?)", [[user_id, game_id, token, operatorId, txn_id, amount, lobby_id, txn_ref_id, description, `${txn_type}`, '2']]);
+        console.log(`Successful ${queue} transaction logged to db`);
+    } catch (err) {
+        console.log(err);
+        subChannel.ack(originalMsg);
+        return;
+    }
+}
+
+async function executeFailureQueriesV2(queue, data, originalMsg) {
+    try {
+        const { user_id, token, operatorId, txn_id, amount, txn_ref_id, description, txn_type, game_id } = data;
+        const lobby_id = description ? getLobbyFromDescription(description) : "";
+        await write("INSERT IGNORE INTO transaction (user_id, game_id, session_token, operator_id, txn_id, amount, lobby_id, txn_ref_id, description, txn_type, txn_status) VALUES (?)", [[user_id, game_id, token, operatorId, txn_id, amount, lobby_id, txn_ref_id, description, `${txn_type}`, '0']]);
+        console.log(`failed ${queue} transaction logged to db`);
+    } catch (err) {
+        console.log(err);
+        subChannel.ack(originalMsg);
+        return;
+    }
+}
+
 module.exports = {
+    initQueue,
     sendToQueue,
-    consumeQueue,
-    handleMessage,
     connect
 };

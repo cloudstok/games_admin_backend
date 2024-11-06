@@ -1,5 +1,5 @@
 
-const {write } = require("../../utilities/db-connection");
+const {write, getWritePool } = require("../../utilities/db-connection");
 const { getRedis } = require("../../utilities/redis-connection");
 const { decryption } = require("../../utilities/ecryption-decryption");
 
@@ -8,7 +8,8 @@ const addWallet = async (req, res) => {
     if (!user_id) {
         return res.status(400).json({ status: false, msg: "User ID is required" });
     }
-    const connection = await write.getConnection();
+    const writePool = getWritePool();
+    const connection = await writePool.getConnection();
     try {
         await connection.beginTransaction();
         const insertWalletQuery = "INSERT IGNORE INTO user_wallet (user_id, balance) VALUES (?, ?)";
@@ -68,21 +69,19 @@ const AllWallet = async (req, res) => {
 
 const userBalance = async (req, res) => {
     try {
-        const { data } = req.body;
-        const operatorUrl = 'http://' + req.headers.host;
-        const [getOperator] = await write(`SELECT secret FROM operator WHERE url = ?`, [operatorUrl]);
-        if (getOperator.length === 0) {
-            return res.status(400).send({ status: false, msg: "Invalid Operator requested" });
-        }
-        const { secret } = getOperator[0];
-        const { userId } = await decryption(data, secret);
-        const [getUserWallet] = await write(`SELECT balance FROM user_wallet WHERE user_id = ?`, [userId]);
+        const token = req.headers.token;
+        if(!token) return res.status(400).send({ status: false, msg: "Necassary token missing in headers"});
+        const getUserDetails = await getRedis(token);
+        if(!getUserDetails) return res.status(400).send({ status: false, msg: "Invalid User Details or session timed out"});
+        const parsedUser = JSON.parse(getUserDetails);
+        const [getUserWallet] = await write(`SELECT balance FROM user_wallet WHERE user_id = ?`, [parsedUser.userId]);
         if (getUserWallet.length === 0) {
             return res.status(400).send({ status: false, msg: "User wallet does not exist" });
         }
-        const userBalance = getUserWallet[0].balance;
-        return res.status(200).send({ status: true, msg: "User balance fetched successfully", balance: userBalance });
+        const balance = getUserWallet[0].balance;
+        return res.status(200).send({ status: true, msg: "User balance fetched successfully", data: {balance} });
     } catch (err) {
+        console.log(err);
         return res.status(500).json({ msg: "Internal server Error", status: false });
     }
 }

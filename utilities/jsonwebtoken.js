@@ -25,7 +25,7 @@ async function verifyToken(req, res, next) {
 }
 
 
-auth = (auth) => async (req, res, next) => {
+const auth = (auth) => async (req, res, next) => {
   
   try {
     const tokenHeader = req.headers.authorization;
@@ -36,8 +36,10 @@ auth = (auth) => async (req, res, next) => {
     if (!verifiedToken) {
       return res.status(401).json({ status : false , "message": "invalid token" })
     }
+   // console.log(verifiedToken.user.user_type)
     if (auth.includes(verifiedToken.user.user_type)) {
       res.locals.auth = verifiedToken;
+      
       next()
     } else {
       return res.status(401).send({ status : false , msg: "You are not authorized.", status: false })

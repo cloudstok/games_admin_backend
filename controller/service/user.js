@@ -27,6 +27,7 @@ const activeUser = async (req, res) => {
 
 const logout = async (req, res) => {
     try {
+    //    await storeStates()
         const token = req.headers.token;
         const user = JSON.parse(await getRedis('users')) || [];
         const activeUser = user.filter(activeToken => activeToken !== token);
@@ -41,8 +42,10 @@ const logout = async (req, res) => {
 };
 // user Detail
 const getUserDetail = async (req, res) => {
+
     const logId = await generateUUIDv7();
     const token = req.headers.token;
+    console.log({token})
     let logDataReq = {logId, token};
     userLogger.info(JSON.stringify(logDataReq));
     let validateUser;
@@ -100,7 +103,7 @@ const getUserDetail = async (req, res) => {
 };
 
 
-const getuserDatatoredis = async (req, res) => {
+const getuserDataFromredis = async (req, res) => {
     try {
       const { token } = req.headers;
       if (!token) {
@@ -118,4 +121,4 @@ const getuserDatatoredis = async (req, res) => {
   };
   
 
-module.exports = { activeUser, logout, getUserDetail , getuserDatatoredis }
+module.exports = { activeUser, logout, getUserDetail , getuserDataFromredis }

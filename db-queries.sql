@@ -147,3 +147,17 @@ create table pending_transactions(
 
 
 ALTER TABLE `games_admin`.`games_master_list` ADD COLUMN `company_name` VARCHAR(60) NULL AFTER `image`, ADD COLUMN `game_code` VARCHAR(60) NULL AFTER `company_name`;
+
+
+CREATE TABLE user_credentials (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id VARCHAR(255) NOT NULL UNIQUE,
+  password VARCHAR(255) NOT NULL,
+  user_type ENUM('agent', 'admin') DEFAULT 'agent',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+
+
+-- ALTER TABLE operator  MODIFY user_type ENUM('agent', 'admin', 'operator') DEFAULT 'agent';

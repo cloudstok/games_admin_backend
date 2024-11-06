@@ -159,11 +159,13 @@ const fetchUserData = async (operatorId, limit, offset) => {
 const getuserDetail = async (req, res) => {
     try {
         const token = getTokenFromHeaders(req.headers);
+        if(!token) return res.status(400).send({ status: false, msg: "Necassary token missing in headers"});
         const validateUser = await getUserDataFromRedis(token);
+        if(!validateUser) return res.status(400).send({ status: false, msg: "Invalid User Details"});
         const { userId, operatorId } = validateUser;
         const user = await fetchUserDetailsFromDatabase(userId);
         if (!user) {
-            return res.status(400).send({ status: false, msg:  "INo User found with this id" });
+            return res.status(400).send({ status: false, msg:  "No User found with this id" });
         }
         return res.status(200).send({ 
             status: true, 
@@ -180,7 +182,7 @@ const getuserDetail = async (req, res) => {
 const getTokenFromHeaders = (headers) => {
     const token = headers.token;
     if (!token) {
-        throw new Error("Token is missing");
+        return false;
     }
     return token;
 };
@@ -189,7 +191,7 @@ const getUserDataFromRedis = async (token) => {
     try {
         return JSON.parse(await getRedis(token));
     } catch (err) {
-        throw new Error("Invalid token data");
+        return false
     }
 };
 

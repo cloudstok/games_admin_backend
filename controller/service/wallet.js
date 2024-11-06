@@ -2,14 +2,17 @@ const axios = require('axios');
 const { getRedis } = require('../../utilities/redis-connection');
 const { encryption } = require('../../utilities/ecryption-decryption');
 const { write, read } = require('../../utilities/db-connection');
-const { getWebhookUrl, generateUUIDv7 } = require('../../utilities/common_function');
+const { getWebhookUrl, generateUUIDv7, getLobbyFromDescription } = require('../../utilities/common_function');
 const { sendToQueue } = require('../../utilities/amqp');
 const getLogger = require('../../utilities/logger');
-const { variableConfig, loadConfig } = require('../../utilities/load-config');
+const { variableConfig } = require('../../utilities/load-config');
 const userBalanceLogger = getLogger('Get_User_Balance', 'jsonl');
 const failedUserBalanceLogger = getLogger('Failed_Get_User_Balance', 'jsonl');
 const updateBalanceLogger = getLogger('User_Update_Balance', 'jsonl');
 const failedUpdateBalanceLogger = getLogger('Failed_User_Update_Balance', 'jsonl');
+const thirdPartyLogger = getLogger('Third_Party_Data', 'jsonl');
+const failedThirdPartyLogger = getLogger('Failed_Third_Party_Data', 'jsonl');
+
 
 const getUserBalance = async (req, res) => {
     const logId = await generateUUIDv7();
@@ -76,6 +79,9 @@ const getUserBalance = async (req, res) => {
 const updateUserBalance = async (req, res) => {
     const logId = await generateUUIDv7();
     const token = req.headers.token;
+    if(!token){
+        return res.status(400).send({ status: false, msg: "Missing token in headers"});
+    }
     const { txn_id, amount, txn_ref_id, description, txn_type, ip, game_id, socket_id, bet_id, user_id } = req.body;
     let game_code = (variableConfig.games_masters_list.find(e=> e.game_id == game_id))?.game_code || null;
     if(!game_code){
@@ -128,6 +134,7 @@ const updateUserBalance = async (req, res) => {
             'Content-Type': 'application/json',
             token
         },
+        timeout: 1000 * 2,
         data: { data: encryptedData }
     };
 
@@ -145,5 +152,88 @@ const updateUserBalance = async (req, res) => {
     }
 };
 
+const updateUserBalanceV2 = async (req, res) => {
+    const logId = await generateUUIDv7();
+    const token = req.headers.token;
+    if(!token){
+        return res.status(400).send({ status: false, msg: "Missing token in headers"});
+    }
+    const { txn_id, amount, description, txn_type, ip, game_id, user_id } = req.body;
+    const lobby_id = description ? getLobbyFromDescription(description) : "";
+    let game_code = (variableConfig.games_masters_list.find(e=> e.game_id == game_id))?.game_code || null;
+    if(!game_code){
+        return res.status(400).send({ status: false, msg: "No game code is available for the game"});
+    }
+    let logDataReq = {logId, token, body: req.body};
+    updateBalanceLogger.info(JSON.stringify(logDataReq));
 
-module.exports = { getUserBalance, updateUserBalance }
+    let validateUser;
+    try {
+        validateUser = JSON.parse(await getRedis(token));
+    } catch (err) {
+        failedUpdateBalanceLogger.error(JSON.stringify({ req: logDataReq, res: 'Error parsing Redis token'}));
+        return res.status(400).send({ status: false, msg: "We've encountered an internal error" });
+    }
+
+    if (!validateUser) {
+        failedUpdateBalanceLogger.error(JSON.stringify({ req: logDataReq, res: 'Invalid token or session timed out'}));
+        return res.status(401).send({ status: false, msg: "Invalid Token or session timed out" });
+    }
+
+    const { operatorId, secret, userId, createdAt } = validateUser;
+
+    let timeDifferenceInHours = (Date.now() - createdAt) / (1000 * 60 * 60);
+
+    if(timeDifferenceInHours > (16 - 4)){
+        return res.status(400).send({ status: false, msg: "Session Timed Out.!" });
+    }
+
+    let operatorUrl;
+    try {
+        operatorUrl = await getWebhookUrl(operatorId, "UPDATE_BALANCE");
+    } catch (err) {
+        failedUpdateBalanceLogger.error(JSON.stringify({ req: logDataReq, res: 'Error while fetching webhook URL'}));
+        return res.status(500).send({ status: false, msg: "Internal Server error" });
+    }
+
+    if (!operatorUrl) {
+        failedUpdateBalanceLogger.error(JSON.stringify({ req: logDataReq, res: 'No URL configured for the event'}));
+        return res.status(400).send({ status: false, msg: "No URL configured for the event" });
+    }
+
+
+    let encryptedData;
+    try {
+        encryptedData = await encryption({ amount, txn_id, description, txn_type, ip, game_id, user_id, game_code }, secret);
+    } catch (err) {
+        failedUpdateBalanceLogger.error(JSON.stringify({ req: logDataReq, res: 'Error while encrypting data'}));
+        return res.status(500).send({ status: false, msg: "Internal Server error" });
+    }
+
+    const options = {
+        method: 'POST',
+        url: operatorUrl,
+        headers: {
+            'Content-Type': 'application/json',
+            token
+        },
+        timeout: 1000 * 3,
+        data: { data: encryptedData }
+    };
+
+    try{
+        const response = await axios(options);
+        //Inserting Success queries to Database
+        thirdPartyLogger.info(JSON.stringify({ req: logDataReq, res: response?.data}));
+        await write("INSERT IGNORE INTO transaction (user_id, game_id, session_token, operator_id, txn_id, amount, lobby_id, description, txn_type, txn_status) VALUES (?)", [[userId, game_id, token, operatorId, txn_id, amount, lobby_id, description, `${txn_type}`, '2']]);
+        return res.status(200).send({ status: true, msg: 'Balance updated successfully'});
+    }catch(err){
+        failedThirdPartyLogger.info(JSON.stringify({ req: logDataReq, res: err?.response?.data, statusCode: err?.response?.status}));
+        await write("INSERT IGNORE INTO transaction (user_id, game_id, session_token, operator_id, txn_id, amount, lobby_id, description, txn_type, txn_status) VALUES (?)", [[userId, game_id, token, operatorId, txn_id, amount, lobby_id, description, `${txn_type}`, '0']]);
+        await sendToQueue('', 'games_rollback', JSON.stringify({...req.body, token, game_code, operatorUrl, secret, operatorId}), 100);
+        return res.status(500).send({ status: false, msg: "Internal Server error" });
+    }
+};
+
+
+module.exports = { getUserBalance, updateUserBalance, updateUserBalanceV2 }

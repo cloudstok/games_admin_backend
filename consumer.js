@@ -1,26 +1,16 @@
 require('dotenv').config();
 const createLogger = require('./utilities/logger');
 const logger = createLogger('Consumer');
-const { consumeQueue, connect, handleMessage } = require('./utilities/amqp');
+const { initQueue, connect } = require('./utilities/amqp');
+const { checkDatabaseConnection } = require('./utilities/db-connection');
+const { loadConfig } = require('./utilities/load-config');
 
 
 
 async function initializeQueues() {
   try {
-      await connect(); // Establishing AMQP Connection
-
-      const Queues = {
-          debit: 'debit_queue',
-          cashout: 'cashout_queue',
-          rollback: 'rollback_queue',
-          failed: 'failed_queue',
-          errored: 'errored_queue'
-      };
-      
-      for (const [key, queue] of Object.entries(Queues)) {
-          consumeQueue(queue, handleMessage);
-      }
-      logger.info('RabbitMQ queues are being consumed');
+    await Promise.all([checkDatabaseConnection()]);
+    await Promise.all([loadConfig({ loadAll: true}), initQueue()]);
   } catch (error) {
       logger.error('Failed to initialize queues:', error);
       process.exit(1); 
