@@ -118,7 +118,7 @@ async function consumeQueue(queue, handler) {
                 rabbitMQLogger.error(`Handler error for ${queue}: ${error.message}`);
                 subChannel.nack(msg);
             }
-        }, { noAck: false });
+        }, { noAck: true });
     } catch (error) {
         rabbitMQLogger.error(`Queue processing error: ${error.message}`);
         throw error;
