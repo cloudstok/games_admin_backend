@@ -1,8 +1,22 @@
 const { default: axios } = require("axios");
 const { read, write } = require("../../utilities/db-connection");
 const { getRedis } = require("../../utilities/redis-connection");
-const { loadConfig } = require("../../utilities/load-config");
+const { loadConfig, variableConfig } = require("../../utilities/load-config");
+const { uploadImage } = require("../../utilities/file_upload");
 
+
+const getGameDetails = (req, res) => {
+  try{
+    const game_code = req.params.game_code;
+    if(!game_code) return res.status(400).json({ status: false, msg: "Missing necassary paramters" });
+    const gameDetails = variableConfig.games_masters_list.find(e=> e.game_code == game_code);
+    if(!gameDetails) return res.status(400).json({ status: false, msg: "Game with game code doesn't exist"});
+    return res.status(200).json({ status: true, data: gameDetails});
+  } catch (err) {
+    console.error("Error fetching operator games:", err);
+    return res.status(500).json({ status: false, msg: "Internal server error" });
+}
+}
 
 const getOperatorGame = async (req, res) => {
     try {
@@ -60,9 +74,14 @@ const addGameForOperator = async (req, res) => {
 
 const serviceAddGame = async (req, res) => {
     try {
+        let image = ''
+        if (req.files && req.files.length > 0) {
+           const data = await uploadImage(req.files)
+         image =data?.Location
+       }
         const { name, url, backendUrl, companyName, code, category } = req.body;
-        const sql = `INSERT IGNORE INTO games_master_list (name, game_category, url , backend_base_url, company_name, game_code) VALUES (?,?,?,?,?,?)`;
-        await write(sql, [name, category, url, backendUrl, companyName, code]);
+        const sql = `INSERT IGNORE INTO games_master_list (name, game_category, url , backend_base_url, company_name, game_code , image) VALUES (?,?,?,?,?,?,?)`;
+        await write(sql, [name, category, url, backendUrl, companyName, code , image]);
         await loadConfig({ loadGames: true });
         return res.status(200).send({ status: true, msg: "Game added successfully to the master's list" });
     } catch (err) {
@@ -70,6 +89,73 @@ const serviceAddGame = async (req, res) => {
         return res.status(500).json({ status: false, msg: "Internal server error", error: err.message });
     }
 }
+
+
+
+const serviceUpdateGame = async (req, res) => {
+    try {
+      let image = '';
+      if (req.files && req.files.length > 0) {
+        const data = await uploadImage(req.files);
+        image = data?.Location;
+      }
+  
+      const { game_id, name, url, backendUrl, companyName, code, category } = req.body;
+  
+      if (!game_id) {
+        return res.status(400).json({ status: false, msg: "Game ID is required for updating." });
+      }
+  
+      // Build the SQL query dynamically to update only provided fields
+      const fieldsToUpdate = [];
+      const values = [];
+  
+      if (name) {
+        fieldsToUpdate.push("name = ?");
+        values.push(name);
+      }
+      if (category) {
+        fieldsToUpdate.push("game_category = ?");
+        values.push(category);
+      }
+      if (url) {
+        fieldsToUpdate.push("url = ?");
+        values.push(url);
+      }
+      if (backendUrl) {
+        fieldsToUpdate.push("backend_base_url = ?");
+        values.push(backendUrl);
+      }
+      if (companyName) {
+        fieldsToUpdate.push("company_name = ?");
+        values.push(companyName);
+      }
+      if (code) {
+        fieldsToUpdate.push("game_code = ?");
+        values.push(code);
+      }
+      if (image) {
+        fieldsToUpdate.push("image = ?");
+        values.push(image);
+      }
+  
+      if (fieldsToUpdate.length === 0) {
+        return res.status(400).json({ status: false, msg: "No fields provided to update." });
+      }
+  
+      values.push(game_id);
+  
+      const sql = `UPDATE games_master_list SET ${fieldsToUpdate.join(", ")} WHERE game_id = ?`;
+      await write(sql, values);
+  
+      await loadConfig({ loadGames: true });
+      return res.status(200).send({ status: true, msg: "Game updated successfully in the master's list" });
+    } catch (err) {
+      console.error("Error updating game in master's list:", err);
+      return res.status(500).json({ status: false, msg: "Internal server error", error: err.message });
+    }
+  };
+  
 
 
 const getMasterListGames = async (req, res) => {
@@ -115,5 +201,5 @@ const getGameURL = async (req, res) => {
 
 
 
-module.exports = { serviceAddGame, getOperatorGame, getMasterListGames, getOperatorGamesForService, addGameForOperator, getGameURL };
+module.exports = { serviceAddGame, getGameDetails, getOperatorGame, getMasterListGames, getOperatorGamesForService, addGameForOperator, getGameURL  , serviceUpdateGame};
 

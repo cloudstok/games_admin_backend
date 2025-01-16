@@ -169,7 +169,7 @@ const getTransactionForRollback = async (data) => {
         }
         const trx_id = await generateUUIDv7();
         const trx_ref_id = txn_type == '0' ? txn_id : txn_ref_id;
-        const debitTransaction = txn_type == '1' ?  await getDebitTransaction(txn_ref_id): {};
+        const debitTransaction = txn_type == '1' ? await getDebitTransaction(txn_ref_id) : {};
         let txn_decription = txn_type == '0' ? description : debitTransaction?.description;
         txn_decription = txn_decription.replace('debited', 'rollback-ed');
         const txn_amount = txn_type == '0' ? amount : debitTransaction?.amount;
@@ -242,23 +242,70 @@ const createOptions = (url, options) => {
         }
     }
     return clientServerOptions
+};
+
+// async function getHourlyStats(category, unit) {
+//     try {
+//         const StatsSQL = `SELECT game_id, operator_id,
+//     SUM(CASE WHEN txn_type = '0' and txn_status = '2' THEN amount ELSE 0 END) AS total_bet_amount,
+//     SUM(CASE WHEN txn_type = '1' and txn_status = '2' THEN amount ELSE 0 END) AS total_win_amount,
+//     SUM(CASE WHEN txn_type = '2' and txn_status = '2' THEN amount ELSE 0 END) AS total_rollback_amount,
+//     COUNT(DISTINCT CASE WHEN txn_ref_id IS NULL THEN txn_id END) as total_bets,
+//     count(distinct user_id) as active_users
+// FROM transaction WHERE created_at >= (NOW() - INTERVAL 1 ${unit})  GROUP BY game_id, operator_id`;
+//       const [statsData] = await read(StatsSQL);
+//       return { unit, category, data: statsData};
+//     } catch (err) {
+//         console.error(`Err while generating stats is::`, err);
+//         return false;
+//     }
+// }
+
+// async function getUserWiseStats(category, unit){
+//     try{
+//         const UserWiseSQLStats = `SELECT user_id, game_id, SUM(CASE WHEN txn_type = '0' and txn_status = '2' THEN amount ELSE 0 END) AS total_bet_amount, SUM(CASE WHEN txn_type = '1' and txn_status = '2' THEN amount ELSE 0 END) AS total_win_amount, SUM(CASE WHEN txn_type = '2' and txn_status = '2' THEN amount ELSE 0 END) AS total_rollback_amount, COUNT(DISTINCT CASE WHEN txn_ref_id IS NULL THEN txn_id END) as total_bets FROM transaction where created_at >= (NOW() - INTERVAL 1 ${unit}) group by user_id, game_id`;
+//         const [UserWiseStatsData] = await read(UserWiseSQLStats);
+//         return { unit, category, data: UserWiseStatsData};
+//     }catch(err){
+//         console.error(`Err while generating stats is::`, err);
+//         return false;
+//     }
+// }
+
+async function getHourlyStats() {
+    try {
+        const StatsSQL = `SELECT game_id, operator_id,
+    SUM(CASE WHEN txn_type = '0' and txn_status = '2' THEN amount ELSE 0 END) AS total_bet_amount,
+    SUM(CASE WHEN txn_type = '1' and txn_status = '2' THEN amount ELSE 0 END) AS total_win_amount,
+    SUM(CASE WHEN txn_type = '2' and txn_status = '2' THEN amount ELSE 0 END) AS total_rollback_amount,
+    COUNT(DISTINCT CASE WHEN txn_ref_id IS NULL THEN txn_id END) as total_bets,
+    count(distinct user_id) as active_users
+FROM transaction WHERE created_at >= (NOW() - INTERVAL 1 HOUR)  GROUP BY game_id, operator_id`;
+        const [statsData] = await read(StatsSQL);
+        return statsData;
+    } catch (err) {
+        console.error(`Err while generating stats is::`, err);
+        return false;
+    }
 }
 
 
-async function storeHourlyStats() {
+async function storeDataStats() {
+    // const statsData = category == 'GAME' ? await getHourlyStats(category, unit) : await getUserWiseStats(category, unit);
+    const statsData = await getHourlyStats();
     const url = process.env.STATS_BASE_URL + '/games/mis/report';
-    const headers = {
-        'Content-Type': 'application/json' 
+    const options = {
+        'url': url,
+        'Content-Type': 'application/json',
+        'method': 'POST',
+        'data': statsData
     };
-    const payload = {
-        data: variableConfig.games_masters_list.map((e) => ({ game_id: e.game_id, name: e.name.replace(' ', '_').toLowerCase() }))
-    };
+
     try {
-        const response = await axios.post(url, payload, { headers });
-        return response.data;
+        await axios(options);
+        console.log(`Stats generated and stored successfully`);
     } catch (error) {
         console.error('Error fetching data:', error.message);
-        return null;
     }
 };
 
@@ -267,4 +314,4 @@ const getLobbyFromDescription = (line) => {
     return parts[parts.length - 1];
 }
 
-module.exports = { generateRandomString, generateRandomUserId, generateUUID, generateUUIDv7, getWebhookUrl, createOptions, getRollbackOptions, getTransactionOptions, storeHourlyStats, getTransactionForRollback, getLobbyFromDescription }
+module.exports = { generateRandomString, generateRandomUserId, generateUUID, generateUUIDv7, getWebhookUrl, createOptions, getRollbackOptions, getTransactionOptions, storeDataStats, getTransactionForRollback, getLobbyFromDescription }

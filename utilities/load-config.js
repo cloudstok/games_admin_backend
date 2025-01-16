@@ -4,11 +4,12 @@ const variableConfig = {
     games_masters_list: [],
     webhook_data : [],
     operator_data: [],
-    user_credentials :[]
+    user_credentials :[],
+    game_webhook_event : []
 }
 
 const loadConfig = async (params = {}) => {
-    const { loadAll = false, loadGames = false, loadWebhook = false, loadOperator = false , loaduser_credentials = false } = params;
+    const { loadAll = false, loadGames = false, loadWebhook = false, loadOperator = false , loaduser_credentials = false  , loadgame_webhook = false} = params;
 
     if (loadAll || loadGames) {
         const [data] = await read(`SELECT * FROM games_master_list WHERE is_active = 1`);
@@ -27,6 +28,10 @@ const loadConfig = async (params = {}) => {
     if (loadAll || loaduser_credentials) {
         const [operatorData] = await read(`SELECT * FROM user_credentials`);
         variableConfig.user_credentials = operatorData;
+    }
+    if (loadAll || loadgame_webhook) {
+        const [operatorData] = await read(`SELECT * FROM game_webhook_config`);
+        variableConfig.game_webhook_event = operatorData;
     }
     console.log("DB Variables loaded in cache");
 };

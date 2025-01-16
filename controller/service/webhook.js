@@ -63,27 +63,71 @@ const get_webhook = async (req, res) => {
 
 
 
+// const update_webhook_url = async (req, res) => {
+//     try {
+//         const { id, url } = req.body;
+//         if (!id || !url) {
+//             return res.status(400).send({ status: false, msg: "ID and URL are required" });
+//         }
+
+//         const sql = "UPDATE webhook_config SET webhook_url = ? WHERE id = ?";
+//         const result = await write(sql, [url, id]);
+//         await loadConfig({ loadWebhook: true});
+//         if (result.affectedRows === 0) {
+//             return res.status(404).send({ status: false, msg: "Webhook configuration not found" });
+//         }
+
+//         return res.status(200).send({ status: true, msg: "Webhook URL updated successfully" });
+//     } catch (err) {
+//         console.error("Error updating webhook URL:", err);
+//         return res.status(500).send({ status: false, msg: "Internal Server Error" });
+//     }
+// }
+
+
+
 const update_webhook_url = async (req, res) => {
     try {
-        const { id, url } = req.body;
-        if (!id || !url) {
-            return res.status(400).send({ status: false, msg: "ID and URL are required" });
-        }
-
-        const sql = "UPDATE webhook_config SET webhook_url = ? WHERE id = ?";
-        const result = await write(sql, [url, id]);
-        await loadConfig({ loadWebhook: true});
-        if (result.affectedRows === 0) {
-            return res.status(404).send({ status: false, msg: "Webhook configuration not found" });
-        }
-
-        return res.status(200).send({ status: true, msg: "Webhook URL updated successfully" });
+      const { id, user_id, url, event } = req.body;
+  
+      if (!id) {
+        return res.status(400).send({ status: false, msg: "Webhook ID is required for updating" });
+      }
+  
+      // Build the SQL query dynamically to update only provided fields
+      const fieldsToUpdate = [];
+      const values = [];
+  
+      if (user_id) {
+        fieldsToUpdate.push("user_id = ?");
+        values.push(user_id);
+      }
+      if (url) {
+        fieldsToUpdate.push("webhook_url = ?");
+        values.push(url);
+      }
+      if (event) {
+        fieldsToUpdate.push("event = ?");
+        values.push(event);
+      }
+  
+      if (fieldsToUpdate.length === 0) {
+        return res.status(400).send({ status: false, msg: "No fields provided to update" });
+      }
+  
+      values.push(id);
+  
+      const sql = `UPDATE webhook_config SET ${fieldsToUpdate.join(", ")} WHERE id = ?`;
+      await write(sql, values);
+  
+      await loadConfig({ loadWebhook: true });
+      return res.status(200).send({ status: true, msg: "Webhook updated successfully" });
     } catch (err) {
-        console.error("Error updating webhook URL:", err);
-        return res.status(500).send({ status: false, msg: "Internal Server Error" });
+      console.error("Error updating webhook:", err);
+      return res.status(500).send({ status: false, msg: "Internal server error", error: err.message });
     }
-}
-
+  };
+  
 
 
 module.exports = {

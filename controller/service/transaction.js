@@ -1,8 +1,9 @@
 const { read } = require("../../utilities/db-connection");
+const { variableConfig } = require("../../utilities/load-config");
 
 const getransaction = async (req, res) => {
     try {
-        let { limit = 100, offset = 0, user_id, operator_id, game_id , txn_id, txn_ref_id, lobby_id, type, start_date, end_date} = req.query;
+        let { limit = 100, offset = 0,txn_status ,  user_id, operator_id, game_id , txn_id, txn_ref_id, lobby_id, type, start_date, end_date} = req.query;
         limit = parseInt(limit);
         offset = parseInt(offset);
         if (isNaN(limit) || isNaN(offset)) {
@@ -45,6 +46,10 @@ const getransaction = async (req, res) => {
             whereConditions.push('txn_type = ?');
             params.push(type);
         }
+        if (txn_status) {
+            whereConditions.push('txn_status = ?');
+            params.push(txn_status);
+        }
 
         if(start_date && end_date) {
             start_date = new Date(start_date).toISOString().slice(0, -5).replace('T', ' ');
@@ -59,7 +64,11 @@ const getransaction = async (req, res) => {
         sql += ' ORDER BY id DESC LIMIT ? OFFSET ?';
         params.push(limit, offset);
         const [data] = await read(sql, params);
-        return res.status(200).send({ status: true, msg: "Find transaction", data });
+        const finalData = data.map(e=> {
+            e.game_name = (variableConfig.games_masters_list.find(game=> game.game_id == e.game_id))?.name || '';
+            return e;
+        });
+        return res.status(200).send({ status: true, msg: "Find transaction", data: finalData });
     } catch (err) {
         console.error('Error:', err);
         return res.status(500).send({ status: false, msg: 'Internal Server Error' });

@@ -1,6 +1,6 @@
 //const { addGame, findGame } = require('../controller/service/game');
 const { register, login, userLogin, getOperatorList, updateGameStatus, updateOperatorDetails, updateOperatorStatus } = require('../controller/service/operator');
-const { serviceAddGame, getOperatorGame, getMasterListGames, getOperatorGamesForService, addGameForOperator, getGameURL } = require('../controller/service/game');
+const { serviceAddGame, getOperatorGame, getMasterListGames, getOperatorGamesForService, addGameForOperator, getGameURL, serviceUpdateGame, getGameDetails } = require('../controller/service/game');
 const { getUserBalance, updateUserBalance, updateUserBalanceV2 } = require('../controller/service/wallet');
 const { verifyToken, auth } = require('../utilities/jsonwebtoken');
 const { activeUser, getUserDetail, getuserDataFromredis } = require('../controller/service/user');
@@ -11,6 +11,8 @@ const { bets, retryTransaction, operatorRollback, report } = require('../control
 const { addAgent, agentList, agentChangePassword, deleteAgent, resetAgentPassword } = require('../controller/service/agent');
 const { addAdmin, adminList, adminChangePassword, deleteAdmin } = require('../controller/service/admin');
 const { loadConfigTOAPI } = require('../utilities/load-config');
+const { getGeameWebhook, addGeameWebhook, update_webhook } = require('../controller/operator/game');
+const { upload } = require('../utilities/file_upload');
 
 
 //Service Panel routes
@@ -21,7 +23,8 @@ serviceRouter.post('/updategamestatus', verifyToken,  auth(['admin', 'superadmin
 serviceRouter.post('/user/login', login);
 serviceRouter.get('/active/user', activeUser);
 serviceRouter.get('/operators/list', verifyToken, auth(['admin' , 'agent', 'superadmin']), getOperatorList);
-serviceRouter.post('/register/game', verifyToken, auth(['admin' , 'operator', 'superadmin']) ,  serviceAddGame)
+serviceRouter.post('/register/game', verifyToken, auth(['admin' , 'operator', 'superadmin']) ,  upload.array('docs' , 1),  serviceAddGame)
+serviceRouter.post('/update/register/game', verifyToken, auth(['admin' , 'operator', 'superadmin']) ,  upload.array('docs' , 1),  serviceUpdateGame)
 serviceRouter.get('/games/list', verifyToken, auth(['admin' , 'operator' , 'agent', 'superadmin']), getMasterListGames);
 serviceRouter.get('/game/operator/:operator_id', verifyToken, auth(['admin' , 'operator', 'superadmin']), getOperatorGamesForService);
 serviceRouter.post('/register/operator/game', verifyToken, auth(['admin' , 'operator', 'superadmin']), addGameForOperator);
@@ -47,20 +50,16 @@ serviceRouter.get('/webhook', auth(['admin' , 'operator', 'superadmin']), get_we
 serviceRouter.get('/webhook/:user_id',auth(['admin' , 'operator', 'superadmin']) , webhook);
 serviceRouter.put('/webhook' ,auth(['admin' , 'operator', 'superadmin']) , update_webhook_url)
 
-
 //rollback list
 serviceRouter.get('/rollback/list', auth(['admin' , 'operator', 'superadmin']) , rollbacklist);
 serviceRouter.post('/operator/rollback/:id', operatorRollback);
 serviceRouter.post('/transaction/retry', auth(['admin' , 'operator', 'superadmin']) ,  retryTransaction);
-
 
 // add admin
 serviceRouter.post('/account/user' ,auth(['admin' , 'superadmin']) , addAdmin)
 serviceRouter.get('/account/user' ,auth(['admin' , 'superadmin']) , adminList)
 serviceRouter.delete('/account/user' ,auth(['admin' , 'superadmin']) , deleteAdmin)
 serviceRouter.post('/account/user/change/password', auth(['agent' , 'admin', 'superadmin'])   , adminChangePassword)
-
-
 
 // add agent
 serviceRouter.post('/agent', auth(['admin' , 'superadmin']), addAgent)
@@ -70,8 +69,11 @@ serviceRouter.post('/agent/change/password', auth(['agent' , 'admin', 'superadmi
 serviceRouter.post('/agent/reset/password', verifyToken, auth(['admin', 'superadmin']), resetAgentPassword);
 // reporte 
 serviceRouter.get('/mis/report', auth(['admin', 'superadmin']) , report)
+serviceRouter.get('/get/game/webhook' , getGeameWebhook)
+serviceRouter.post('/add/game/webhook' , addGeameWebhook)
+serviceRouter.put('/update/game/webhook' , update_webhook)
 
-
+serviceRouter.get('/game/details/:game_code', getGameDetails);
 
 //loadConfigTOAPI
 serviceRouter.post('/loadconfig' , auth(['admin' , 'superadmin', 'superadmin']) , loadConfigTOAPI)

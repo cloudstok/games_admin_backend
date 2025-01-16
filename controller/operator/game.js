@@ -2,7 +2,7 @@
 const { default: axios } = require("axios");
 const { read, write } = require("../../utilities/db-connection");
 const { getRedis } = require("../../utilities/redis-connection");
-
+const {variableConfig, loadConfig} = require('../../utilities/load-config')
 
 const addGame = async (req, res) => {
     try {
@@ -84,4 +84,131 @@ const getGeame = async (req, res) => {
 }
 
 
-module.exports = { addGame, findGame, operatorFindGame, getGeame }
+const addGeameWebhook = async (req, res) => {
+    try {
+        const { game_id, event, url } = req.body;
+
+        if (!game_id || !event || !url) {
+            return res.status(400).json({ status: false, msg: "Missing required fields" });
+        }
+
+        // Insert the data into the database
+        const [result] = await read(
+            "INSERT INTO game_webhook_config (game_id, url, event) VALUES (?, ?, ?)",
+            [game_id, url, event]
+        );
+        await  loadConfig({loadgame_webhook : true})
+        return res.status(200).send({ 
+            status: true, 
+           msg  :  "webhook add successfully"
+        });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ msg: "Internal Server Error", status: false });
+    }
+};
+
+
+const update_webhook = async (req, res) => {
+    try {
+      const { id, user_id, url, event , is_deleted } = req.body;
+      if (!id) {
+        return res.status(400).send({ status: false, msg: "Webhook ID is required for updating" });
+      }
+      const fieldsToUpdate = [];
+      const values = [];
+      if (user_id) {
+        fieldsToUpdate.push("user_id = ?");
+        values.push(user_id);
+      }
+      if (url) {
+        fieldsToUpdate.push("webhook_url = ?");
+        values.push(url);
+      }
+      if (event) {
+        fieldsToUpdate.push("event = ?");
+        values.push(event);
+      }
+      if (parseInt(is_deleted) == 0  || parseInt(is_deleted) == 1) {
+        const newStatus = is_deleted ? 0 : 1;
+        fieldsToUpdate.push("is_deleted = ?");
+        values.push(newStatus);
+      }
+      if (fieldsToUpdate.length === 0) {
+        return res.status(400).send({ status: false, msg: "No fields provided to update" });
+      }
+      values.push(id);
+      const sql = `UPDATE game_webhook_config SET ${fieldsToUpdate.join(", ")} WHERE id = ?`;
+      console.log({sql})
+      await write(sql, values);
+      await loadConfig({ loadgame_webhook: true });
+      return res.status(200).send({ status: true, msg: "Webhook updated successfully" });
+    } catch (err) {
+      console.error("Error updating webhook:", err);
+      return res.status(500).send({ status: false, msg: "Internal server error", error: err.message });
+    }
+  };
+  
+
+// const getGeameWebhook = async (req, res) => {
+//     try {
+    
+//         const updatedGameWebhookEvents = variableConfig.game_webhook_event.map(e => {
+//             const gameMaster = variableConfig.games_masters_list.find(el => el.game_id === e.game_id);
+//             const name = gameMaster ? gameMaster.name : null; // Handle cases where gameMaster is not found
+//             return { ...e, name }; // Add the name to the current event object
+//         });
+
+//         return res.status(200).send({
+//             status: true,
+//             data:  updatedGameWebhookEvents
+//         });
+//     } catch (err) {
+//         console.error(err); // Use error for better context
+//         return res.status(500).json({ msg: "Internal Server Error", status: false });
+//     }
+// };
+
+
+const getGeameWebhook = async (req, res) => {
+    try {
+        const limit = parseInt(req.query.limit) || null;
+        const offset = parseInt(req.query.offset) || 0;
+        const game_id = req.query.game_id ? parseInt(req.query.game_id) : null; 
+        const event = req.query.event || null;
+
+        const updatedGameWebhookEvents = variableConfig.game_webhook_event.map(e => {
+            const gameMaster = variableConfig.games_masters_list.find(el => el.game_id.toString().toLowerCase() === e.game_id.toString().toLowerCase());
+            const name = gameMaster ? gameMaster.name : null;
+            return { ...e, name };
+        });
+
+        let filteredData = updatedGameWebhookEvents;
+
+        if (game_id) {
+            filteredData = filteredData.filter(e => e.game_id === game_id);
+        }
+        if (event) {
+            filteredData = filteredData.filter(e =>( e.event.toLowerCase() === event.toLowerCase()) && !e.is_deleted );
+        }
+
+        const paginatedData = limit
+            ? filteredData.slice(offset, offset + limit)
+            : filteredData;
+
+        return res.status(200).send({
+            status: true,
+            data: paginatedData,
+            total: filteredData.length,
+            limit: limit || filteredData.length, 
+            offset, 
+        });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ msg: "Internal Server Error", status: false });
+    }
+};
+
+
+
+module.exports = { addGame, findGame, operatorFindGame, getGeame , getGeameWebhook , addGeameWebhook   , update_webhook}

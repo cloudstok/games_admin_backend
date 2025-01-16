@@ -45,6 +45,7 @@ const insertUserIntoDatabase = async (id, name, userId, hashedPassword, currency
 const userLogin = async (req, res) => {
     try {
         const { userId, password } = req.body;
+       
         const { pub_key, secret } = await getOperatorCredentials();
         const user = await getUserDetails(userId);
         if (!user) {

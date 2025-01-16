@@ -89,7 +89,6 @@ const userBalance = async (req, res) => {
 const updateBalance = async (req, res) => {
     try {
         const { data } = req.body;
-        // return res.status(422).send({ status: false, msg: "Error Occurred"})
         const token = req.headers.token;
         let validateUser;
         try {

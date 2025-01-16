@@ -69,14 +69,16 @@ async function connect() {
             connection.createChannel(),
             connection.createChannel()
         ]);
-        await pubChannel.assertExchange(exchange, "x-delayed-message", { autoDelete: false, durable: true,  
-            arguments: { "x-delayed-type": "direct" } });    
+        await pubChannel.assertExchange(exchange, "x-delayed-message", {
+            autoDelete: false, durable: true,
+            arguments: { "x-delayed-type": "direct" }
+        });
         pubChannel.removeAllListeners('close');
         pubChannel.removeAllListeners('error');
         subChannel.removeAllListeners('close');
         subChannel.removeAllListeners('error');
         pubChannel.on('close', async () => { console.error("pubChannel Closed"); pubChannel = null; connected = false; });
-        subChannel.on('close', async () => { console.error("subChannel Closed"); subChannel = null; connected = false; setTimeout(()=>initQueue(),1000)});
+        subChannel.on('close', async () => { console.error("subChannel Closed"); subChannel = null; connected = false; setTimeout(() => initQueue(), 1000) });
         pubChannel.on('error', async (msg) => { console.error("pubChannel Error", msg); });
         subChannel.on('error', async (msg) => { console.error("subChannel Error", msg); });
         rabbitMQLogger.info("🛸 Created RabbitMQ Channel successfully");
@@ -157,7 +159,7 @@ async function handleMessage(queue, msg) {
                 subChannel.ack(msg);
             } else {
                 console.error(`Request failed for ${queue}: ${response.status}`);
-                failedThirdPartyLogger.error(JSON.stringify({ req: logDataReq, res: response?.data }));
+                failedThirdPartyLogger.error(JSON.stringify({ req: logDataReq, res1: response?.data }));
                 const insertId = await handleFailure(queue, dbData, message, retries);
                 if (insertId) {
                     dbData.transaction_id = insertId
@@ -166,7 +168,7 @@ async function handleMessage(queue, msg) {
             }
         } catch (error) {
             let response = error.response ? error.response.data : error;
-            failedThirdPartyLogger.error(JSON.stringify({ req: logDataReq, res: response }));
+            failedThirdPartyLogger.error(JSON.stringify({ req: logDataReq, res2: response }));
             console.error(`Request failed for ${queue}: ${error.message}`);
             const insertId = await handleFailure(queue, dbData, message, retries);
             if (insertId) {
@@ -338,11 +340,27 @@ async function handleQueueMessage(queue, msg) {
         }
 
         let postData;
-        if (queue == v2Queues.rollbackV2 && retries == 0) postData = await getRollbackOptions(message);
-        if (queue == v2Queues.cashoutV2 && retries == 0) postData = await getTransactionOptions(message);
+        if (queue == v2Queues.rollbackV2  &&  !("options" in message) ) postData = await getRollbackOptions(message);
+        else if (queue == v2Queues.cashoutV2 && !("options" in message) ) postData = await getTransactionOptions(message);
         else postData = message;
+        let options = postData.options;
         try {
-            const response = await axios(postData.options);
+            if (!options) {
+                const { amount, txn_id, description, txn_type, ip, game_id, user_id, game_code, secret, operatorUrl, token } = postData;
+                const encryptedData = await encryption({ amount, txn_id, description, txn_type, ip, game_id, user_id, game_code }, secret);
+
+                options = {
+                    method: 'POST',
+                    url: operatorUrl,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        token
+                    },
+                    timeout: 1000 * 3,
+                    data: { data: encryptedData }
+                };
+            }
+            const response = await axios(options);
             if (response.status == 200) {
                 thirdPartyLogger.info(JSON.stringify({ req: logReqObj, res: response?.data }));
                 console.log(`Request succeeded for ${queue}:`, response.data);
@@ -350,13 +368,29 @@ async function handleQueueMessage(queue, msg) {
                 subChannel.ack(msg);
             }
         } catch (err) {
-            failedThirdPartyLogger.info(JSON.stringify({ req: logReqObj, res: err?.response?.status}))
-            if (err?.response?.status == 404 && queue == v2Queues.rollbackV2) {
-                thirdPartyLogger.info(JSON.stringify({ req: logReqObj, res: err?.response?.status }));
-                subChannel.ack(msg);
-            } else await handleRetryOrMoveToNextQueueV2(queue, postData, msg, retries);
+            const objForErr = {
+                req: msg.content.toString(),
+                res3: JSON.parse(JSON.stringify(err?.response?.data|| err)),
+                postData,
+                queue,
+                retries,
+                statusCode: ""+err?.response?.status+ " "+ err?.code,
+                message: err?.message || "Unkown Error",
+                stack: err?.stack || "No Stack for the request"
+            }
+            const span = process.tracer.scope().active();
+            span.setTag('error', err);
+            failedThirdPartyLogger.error(JSON.stringify(objForErr))
+            await handleRetryOrMoveToNextQueueV2(queue, postData, msg, retries);
         }
     } catch (err) {
+        const objForErr = {
+            req: msg.content.toString(),
+            statusCode: "Unkown Error from catch please debug",
+            message: err?.message || "Unkown Error",
+            stack: err?.stack || "No Stack for the request"
+        }
+        failedThirdPartyLogger.error(JSON.stringify(objForErr));
         subChannel.ack(msg);
         return;
     }
@@ -388,19 +422,19 @@ async function handleRetryOrMoveToNextQueueV2(currentQueue, message, originalMsg
 
         if (retries <= MAX_RETRIES) {
             console.log(`Retrying message in ${currentQueue} (retry #${retries})`);
-                try {
-                    await sendToQueue('', currentQueue, JSON.stringify(message), RETRY_DELAY_MS*(retries+1), retries);
-                    subChannel.ack(originalMsg);
-                } catch (error) {
-                    console.error(`Failed to retry message in ${currentQueue}: ${error.message}`);
-                    subChannel.nack(originalMsg);
-                }
+            try {
+                await sendToQueue('', currentQueue, JSON.stringify(message), RETRY_DELAY_MS * (retries + 1), retries);
+                subChannel.ack(originalMsg);
+            } catch (error) {
+                console.error(`Failed to retry message in ${currentQueue}: ${error.message}`);
+                subChannel.nack(originalMsg);
+            }
         } else {
             const nextQueue = currentQueue === v2Queues.cashoutV2 ? v2Queues.rollbackV2 : v2Queues.failedV2;
             console.log(`Moving message from ${currentQueue} to ${nextQueue}`);
             retries = 0;
             try {
-                await sendToQueue('', nextQueue, JSON.stringify(message), RETRY_DELAY_MS*(retries+1), retries);
+                await sendToQueue('', nextQueue, JSON.stringify(message), RETRY_DELAY_MS * (retries + 1), retries);
                 subChannel.ack(originalMsg);
             } catch (error) {
                 console.error(`Failed to move message from ${currentQueue} to ${nextQueue}: ${error.message}`);
