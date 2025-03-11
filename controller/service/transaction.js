@@ -124,7 +124,39 @@ const rollbacklist = async (req, res) => {
 };
 
 
+const getransactionbyuser = async (req, res) => {
+    try {
+        let { limit = 30, offset = 0, user_id, operator_id } = req.query;
+        limit = parseInt(limit);
+        offset = parseInt(offset);
+        if (isNaN(limit) || isNaN(offset)) {
+            return res.status(400).send({ status: false, msg: "Invalid limit or offset" });
+        }
+        if (!user_id || !operator_id) {
+            return res.status(400).send({ status: false, msg: "user_id and operator_id are required" });
+        }
+        console.log({user_id , operator_id})
+        //let sql = 'SELECT * FROM transaction where user_id = ? and operator_id = ? limit 10';
+        let sql = 'SELECT id,user_id,game_id,operator_id,txn_id,amount,lobby_id,txn_ref_id,description,txn_type,created_at FROM transaction WHERE user_id = ? AND operator_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?';
+        const params = [user_id, operator_id, limit, offset];
+        const [data] = await read(sql, params);
+        const finalData = data.map(e => {
+            e.game_name = (variableConfig.games_masters_list.find(game => game.game_id == e.game_id))?.name || '';
+            return e;
+        });
+        
+        return res.status(200).send({ status: true, msg: "Find transaction", data: finalData });
+    } catch (err) {
+        console.error('Error:', err);
+        return res.status(500).send({ status: false, msg: 'Internal Server Error' });
+    }
+};
+
+
+
+
 module.exports = {
     getransaction,
-    rollbacklist
+    rollbacklist,
+    getransactionbyuser
 }

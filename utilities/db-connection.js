@@ -11,6 +11,14 @@ const dbConfig = {
     port: process.env.DB_PORT
 };
 
+const dbReadConfig = {
+    host: process.env.DB_READ_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
+    port: process.env.DB_PORT
+};
+
 const maxRetries = Number(process.env.DB_MAX_RETRIES); 
 const retryInterval = Number(process.env.MAX_RETRY_INTERVAL); 
 
@@ -43,7 +51,7 @@ const getWritePool = () => {
 
 const initializePools = async () => {
     try {
-        readPool = await createDatabasePool(dbConfig);
+        readPool = await createDatabasePool(dbReadConfig);
         writePool = await createDatabasePool(dbConfig);
         logger.info("DATABASE CONNECTION SUCCESSFUL");
     } catch (err) {

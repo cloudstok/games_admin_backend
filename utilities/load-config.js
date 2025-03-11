@@ -9,7 +9,7 @@ const variableConfig = {
 }
 
 const loadConfig = async (params = {}) => {
-    const { loadAll = false, loadGames = false, loadWebhook = false, loadOperator = false , loaduser_credentials = false  , loadgame_webhook = false} = params;
+    const { loadAll = false, loadGames = false, loadWebhook = false, loadOperator = false , loaduser_credentials = false , loadgame_webhook = false } = params;
 
     if (loadAll || loadGames) {
         const [data] = await read(`SELECT * FROM games_master_list WHERE is_active = 1`);

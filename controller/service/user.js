@@ -60,8 +60,8 @@ const getUserDetail = async (req, res) => {
         return res.status(401).send({ status: false, msg: "Invalid Token or session timed out" });
     }
 
-    const { operatorId } = validateUser;
-
+    const { operatorId, userId } = validateUser;
+    
     let operatorUrl;
     try {
         operatorUrl = await getWebhookUrl(operatorId, "USER_DETAILS");
@@ -81,7 +81,8 @@ const getUserDetail = async (req, res) => {
         url: operatorUrl,
         headers: {
             'Content-Type': 'application/json',
-            token
+             token,
+            'x-user-id': userId
         }
     };
 

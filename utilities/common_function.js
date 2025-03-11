@@ -75,12 +75,13 @@ const getWebhookUrl = async (user_id, event_name) => {
 }
 
 const getRollbackOptions = async (data) => {
+    const txn_type = 2;
     const { amount, txn_id, ip, game_id, user_id, game_code, secret, operatorUrl, token } = data;
-    const trx_id = generateUUIDv7();
+    const trx_id = await generateUUIDv7();
     const description = `${amount} Rollback-ed for transaction with reference ID ${txn_id}`
     let encryptedData;
     try {
-        encryptedData = await encryption({ amount, txn_id: trx_id, txn_ref_id: txn_id, description, txn_type: 2, ip, game_id, user_id, game_code }, secret);
+        encryptedData = await encryption({ amount, txn_id: trx_id, txn_ref_id: txn_id, description, txn_type, ip, game_id, user_id, game_code }, secret);
     } catch (err) {
         return;
     }
@@ -89,18 +90,19 @@ const getRollbackOptions = async (data) => {
         url: operatorUrl,
         headers: {
             'Content-Type': 'application/json',
-            token
+            token,
+            'x-user-id': user_id
         },
         timeout: 1000 * 3,
         data: { data: encryptedData }
     };
-    const dbData = { txn_id: trx_id, description, txn_ref_id: txn_id, txn_type: 2, amount, game_id, user_id, token, operatorId: data.operatorId };
+    const dbData = { txn_id: trx_id, description, txn_ref_id: txn_id, txn_type, amount, game_id, user_id, token, operatorId: data.operatorId };
     return { options: postOptions, dbData };
 }
 
 const getTransactionOptions = async (data) => {
-
-    const { amount, txn_id, txn_ref_id, ip, game_id, user_id, operatorId, txn_type, token, description } = data;
+    const txn_type = 1;
+    const { amount, txn_id, txn_ref_id, ip, game_id, user_id,  token, description } = data;
     const game_code = (variableConfig.games_masters_list.find(e => e.game_id == game_id))?.game_code || null;
 
     if (!game_code) {
@@ -119,7 +121,7 @@ const getTransactionOptions = async (data) => {
         return false;
     }
 
-    const secret = validateUser.secret;
+    const {secret,operatorId} = validateUser;
     let encryptedData;
 
     try {
@@ -145,7 +147,8 @@ const getTransactionOptions = async (data) => {
         url: operatorUrl,
         headers: {
             'Content-Type': 'application/json',
-            token
+            token,
+            'x-user-id': user_id
         },
         timeout: 1000 * 3,
         data: { data: encryptedData }
@@ -169,7 +172,7 @@ const getTransactionForRollback = async (data) => {
         }
         const trx_id = await generateUUIDv7();
         const trx_ref_id = txn_type == '0' ? txn_id : txn_ref_id;
-        const debitTransaction = txn_type == '1' ? await getDebitTransaction(txn_ref_id) : {};
+        const debitTransaction = txn_type == '1' ?  await getDebitTransaction(txn_ref_id): {};
         let txn_decription = txn_type == '0' ? description : debitTransaction?.description;
         txn_decription = txn_decription.replace('debited', 'rollback-ed');
         const txn_amount = txn_type == '0' ? amount : debitTransaction?.amount;
@@ -242,35 +245,7 @@ const createOptions = (url, options) => {
         }
     }
     return clientServerOptions
-};
-
-// async function getHourlyStats(category, unit) {
-//     try {
-//         const StatsSQL = `SELECT game_id, operator_id,
-//     SUM(CASE WHEN txn_type = '0' and txn_status = '2' THEN amount ELSE 0 END) AS total_bet_amount,
-//     SUM(CASE WHEN txn_type = '1' and txn_status = '2' THEN amount ELSE 0 END) AS total_win_amount,
-//     SUM(CASE WHEN txn_type = '2' and txn_status = '2' THEN amount ELSE 0 END) AS total_rollback_amount,
-//     COUNT(DISTINCT CASE WHEN txn_ref_id IS NULL THEN txn_id END) as total_bets,
-//     count(distinct user_id) as active_users
-// FROM transaction WHERE created_at >= (NOW() - INTERVAL 1 ${unit})  GROUP BY game_id, operator_id`;
-//       const [statsData] = await read(StatsSQL);
-//       return { unit, category, data: statsData};
-//     } catch (err) {
-//         console.error(`Err while generating stats is::`, err);
-//         return false;
-//     }
-// }
-
-// async function getUserWiseStats(category, unit){
-//     try{
-//         const UserWiseSQLStats = `SELECT user_id, game_id, SUM(CASE WHEN txn_type = '0' and txn_status = '2' THEN amount ELSE 0 END) AS total_bet_amount, SUM(CASE WHEN txn_type = '1' and txn_status = '2' THEN amount ELSE 0 END) AS total_win_amount, SUM(CASE WHEN txn_type = '2' and txn_status = '2' THEN amount ELSE 0 END) AS total_rollback_amount, COUNT(DISTINCT CASE WHEN txn_ref_id IS NULL THEN txn_id END) as total_bets FROM transaction where created_at >= (NOW() - INTERVAL 1 ${unit}) group by user_id, game_id`;
-//         const [UserWiseStatsData] = await read(UserWiseSQLStats);
-//         return { unit, category, data: UserWiseStatsData};
-//     }catch(err){
-//         console.error(`Err while generating stats is::`, err);
-//         return false;
-//     }
-// }
+}
 
 async function getHourlyStats() {
     try {
@@ -281,23 +256,21 @@ async function getHourlyStats() {
     COUNT(DISTINCT CASE WHEN txn_ref_id IS NULL THEN txn_id END) as total_bets,
     count(distinct user_id) as active_users
 FROM transaction WHERE created_at >= (NOW() - INTERVAL 1 HOUR)  GROUP BY game_id, operator_id`;
-        const [statsData] = await read(StatsSQL);
-        return statsData;
+      const [statsData] = await read(StatsSQL);
+      return statsData;
     } catch (err) {
         console.error(`Err while generating stats is::`, err);
         return false;
     }
-}
+};
 
-
-async function storeDataStats() {
-    // const statsData = category == 'GAME' ? await getHourlyStats(category, unit) : await getUserWiseStats(category, unit);
+async function storeHourlyStats() {
     const statsData = await getHourlyStats();
     const url = process.env.STATS_BASE_URL + '/games/mis/report';
     const options = {
         'url': url,
         'Content-Type': 'application/json',
-        'method': 'POST',
+        'method' : 'POST',
         'data': statsData
     };
 
@@ -314,4 +287,4 @@ const getLobbyFromDescription = (line) => {
     return parts[parts.length - 1];
 }
 
-module.exports = { generateRandomString, generateRandomUserId, generateUUID, generateUUIDv7, getWebhookUrl, createOptions, getRollbackOptions, getTransactionOptions, storeDataStats, getTransactionForRollback, getLobbyFromDescription }
+module.exports = { generateRandomString, generateRandomUserId, generateUUID, generateUUIDv7, getWebhookUrl, createOptions, getRollbackOptions, getTransactionOptions, storeHourlyStats, getTransactionForRollback, getLobbyFromDescription }

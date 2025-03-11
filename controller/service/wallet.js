@@ -33,7 +33,7 @@ const getUserBalance = async (req, res) => {
         return res.status(401).send({ status: false, msg: "Invalid Token or session timed out" });
     }
 
-    const { operatorId } = validateUser;
+    const { operatorId, userId } = validateUser;
 
     let operatorUrl;
     try {
@@ -54,7 +54,8 @@ const getUserBalance = async (req, res) => {
         url: operatorUrl,
         headers: {
             'Content-Type': 'application/json',
-            token
+            token,
+            'x-user-id': userId
         }
     };
 
@@ -84,11 +85,9 @@ const updateUserBalance = async (req, res) => {
     }
     const { txn_id, amount, txn_ref_id, description, txn_type, ip, game_id, socket_id, bet_id, user_id } = req.body;
     let game_code = (variableConfig.games_masters_list.find(e=> e.game_id == game_id))?.game_code || null;
-
     if(!game_code){
         return res.status(400).send({ status: false, msg: "No game code is available for the game"});
     }
-    
     let logDataReq = {logId, token, body: req.body};
     updateBalanceLogger.info(JSON.stringify(logDataReq));
 
@@ -134,7 +133,8 @@ const updateUserBalance = async (req, res) => {
         url: operatorUrl,
         headers: {
             'Content-Type': 'application/json',
-            token
+            token,
+            'x-user-id': userId
         },
         timeout: 1000 * 3,
         data: { data: encryptedData }
@@ -220,7 +220,8 @@ const updateUserBalanceV2 = async (req, res) => {
         url: operatorUrl,
         headers: {
             'Content-Type': 'application/json',
-            token
+            token,
+            'x-user-id': userId
         },
         timeout: 1000 * 3,
         data: { data: encryptedData }
@@ -229,15 +230,15 @@ const updateUserBalanceV2 = async (req, res) => {
     try{
         const response = await axios(options);
         //Inserting Success queries to Database
-        thirdPartyLogger.info(JSON.stringify({ req: logDataReq, res: response?.data}));
+        thirdPartyLogger.info(JSON.stringify({ req: {...logDataReq, ...options}, res: response?.data}));
         await write("INSERT IGNORE INTO transaction (user_id, game_id, session_token, operator_id, txn_id, amount, lobby_id, txn_ref_id, description, txn_type, txn_status) VALUES (?)", [[userId, game_id, token, operatorId, txn_id, amount, lobby_id, txnRefId, description, `${txn_type}`, '2']]);
         return res.status(200).send({ status: true, msg: 'Balance updated successfully'});
     }catch(err){
         const objForErr = {
             req: logDataReq,
             res4: JSON.parse(JSON.stringify(err?.response?.data||{})),
-            statusCode: "" + err?.response?.status + " " + err?.code,
-            message: err.message || "Unkown Error",
+            statusCode: ""+err?.response?.status+ " "+ err?.code,
+            message:err.message || "Unkown Error",
             stack: err.stack
         }
         const span = process.tracer.scope().active();
@@ -245,7 +246,7 @@ const updateUserBalanceV2 = async (req, res) => {
         failedThirdPartyLogger.error(JSON.stringify(objForErr));
         await write("INSERT IGNORE INTO transaction (user_id, game_id, session_token, operator_id, txn_id, amount, lobby_id, txn_ref_id, description, txn_type, txn_status) VALUES (?)", [[userId, game_id, token, operatorId, txn_id, amount, lobby_id, txnRefId, description, `${txn_type}`, '0']]);
         await sendToQueue('', 'games_rollback', JSON.stringify({...req.body, token, game_code, operatorUrl, secret, operatorId}), 100);
-        return res.status(500).send({ status: false, msg: "Internal Server error" });
+        return res.status(500).send({ status: false, msg: err?.response?.data?.message || "Internal Server error" });
     }
 };
 

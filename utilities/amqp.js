@@ -298,7 +298,7 @@ async function handleRetryOrMoveToNextQueue(currentQueue, message, originalMsg, 
         console.log(`Retrying message in ${currentQueue} (retry #${retries})`);
         setTimeout(async () => {
             try {
-                await sendToQueue('', currentQueue, JSON.stringify(message), RETRY_DELAY_MS, retries);
+                await sendToQueue('', currentQueue, JSON.stringify(message), RETRY_DELAY_MS*60, retries);
                 subChannel.ack(originalMsg);
             } catch (error) {
                 console.error(`Failed to retry message in ${currentQueue}: ${error.message}`);
@@ -354,7 +354,8 @@ async function handleQueueMessage(queue, msg) {
                     url: operatorUrl,
                     headers: {
                         'Content-Type': 'application/json',
-                        token
+                        token,
+                        'x-user-id': user_id
                     },
                     timeout: 1000 * 3,
                     data: { data: encryptedData }
@@ -369,6 +370,7 @@ async function handleQueueMessage(queue, msg) {
             }
         } catch (err) {
             const objForErr = {
+                timestamp:Date.now(),
                 req: msg.content.toString(),
                 res3: JSON.parse(JSON.stringify(err?.response?.data|| err)),
                 postData,
@@ -423,7 +425,7 @@ async function handleRetryOrMoveToNextQueueV2(currentQueue, message, originalMsg
         if (retries <= MAX_RETRIES) {
             console.log(`Retrying message in ${currentQueue} (retry #${retries})`);
             try {
-                await sendToQueue('', currentQueue, JSON.stringify(message), RETRY_DELAY_MS * (retries + 1), retries);
+                await sendToQueue('', currentQueue, JSON.stringify(message), RETRY_DELAY_MS * (retries + 60), retries);
                 subChannel.ack(originalMsg);
             } catch (error) {
                 console.error(`Failed to retry message in ${currentQueue}: ${error.message}`);
@@ -434,7 +436,7 @@ async function handleRetryOrMoveToNextQueueV2(currentQueue, message, originalMsg
             console.log(`Moving message from ${currentQueue} to ${nextQueue}`);
             retries = 0;
             try {
-                await sendToQueue('', nextQueue, JSON.stringify(message), RETRY_DELAY_MS * (retries + 1), retries);
+                await sendToQueue('', nextQueue, JSON.stringify(message), RETRY_DELAY_MS * (retries + 60), retries);
                 subChannel.ack(originalMsg);
             } catch (error) {
                 console.error(`Failed to move message from ${currentQueue} to ${nextQueue}: ${error.message}`);

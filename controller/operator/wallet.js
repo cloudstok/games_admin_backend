@@ -1,5 +1,5 @@
 
-const {write, getWritePool } = require("../../utilities/db-connection");
+const {write, getWritePool, read } = require("../../utilities/db-connection");
 const { getRedis } = require("../../utilities/redis-connection");
 const { decryption } = require("../../utilities/ecryption-decryption");
 
@@ -111,6 +111,7 @@ const updateBalance = async (req, res) => {
             query = `UPDATE user_wallet SET balance = balance - ? WHERE user_id = ?`;
         }
         const [updateUserBalance] = await write(query, [amount, userId]);
+        //await checkuserBalance(userId)
         if (updateUserBalance.affectedRows !== 0) {
             return res.status(200).send({ status: true, msg: "User balance updated successfully" });
         } else {
@@ -120,6 +121,12 @@ const updateBalance = async (req, res) => {
         console.error("Error updating user balance:", err);
         return res.status(500).json({ msg: "Internal server Error", status: false });
     }
+}
+
+
+const checkuserBalance = async(userId)=>{
+        const checkbalance = await read("SELECT * FROM user_wallet where user_id = ?" [userId])
+        console.log({checkbalance})
 }
 
 

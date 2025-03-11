@@ -32,7 +32,7 @@ const getOperatorGame = async (req, res) => {
             return res.status(401).send({ status: false, msg: "Token expired or request timed out" });
         }
         const { operatorId } = validateUser;
-        const sql = ` SELECT *  FROM operator_games AS og  INNER JOIN games_master_list AS gml  ON gml.game_id = og.game_id  WHERE operator_id = ? and og.is_active = 1`;
+        const sql = ` SELECT * FROM operator_games AS og  INNER JOIN games_master_list AS gml  ON gml.game_id = og.game_id  WHERE operator_id = ? and og.is_active = 1`;
         const [gamesList] = await write(sql, [operatorId]);
         return res.status(200).send({ status: true, msg: "Games fetched successfully for operator", data: gamesList });
     } catch (err) {
@@ -60,16 +60,25 @@ const getOperatorGamesForService = async (req, res) => {
 
 
 const addGameForOperator = async (req, res) => {
-    try {
-        const { operator_id, game_id } = req.body;
-        const sql = `INSERT IGNORE INTO operator_games (game_id, operator_id) VALUES (?, ?)`;
-        await write(sql, [game_id, operator_id]);
-        return res.status(200).send({ status: true, msg: "Game assigned successfully to operator" });
-    } catch (err) {
-        console.error("Error assigning game to operator:", err);
-        return res.status(500).json({ status: false, msg: "Internal server error", error: err.message });
-    }
-}
+  try {
+      const { operator_id, game_id } = req.body;
+      if (!operator_id || !game_id) {
+          return res.status(400).json({ status: false, msg: "operator_id and game_id are required" });
+      }
+      const [opGame] = await read("SELECT * FROM operator_games WHERE game_id = ? AND operator_id = ?", [game_id, operator_id]);
+      if (!opGame || opGame.length === 0) {
+          const sql = `INSERT IGNORE INTO operator_games (game_id, operator_id) VALUES (?, ?)`;
+          await write(sql, [game_id, operator_id]);
+          return res.status(200).json({ status: true, msg: "Game assigned successfully to operator" });
+      } else {
+          return res.status(400).json({ status: false, msg: "Game is already assigned to this operator" });
+      }
+  } catch (err) {
+      console.error("Error assigning game to operator:", err);
+      return res.status(500).json({ status: false, msg: "Internal server error", error: err.message });
+  }
+};
+
 
 
 const serviceAddGame = async (req, res) => {
