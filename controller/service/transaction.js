@@ -182,7 +182,7 @@ const voidBet = async (req, res) => {
             return res.status(400).send({ status: false, msg: "No game code is available for the game" });
         };
 
-        const description = `${debitAmount} debited for voiding ${gameData.name} game bet with reference id ${creditTxn.txn_id}`;
+        const description = `${debitAmount} debited for voiding ${gameData.name.toLowerCase()} game bet with reference id ${creditTxn.txn_id}`;
         const operatorData = variableConfig.operator_data.find(e=> e.user_id == operator_id);
 
         if(!operatorData) return res.status(400).send({ status: false, msg: `Operator not found for this transaction`})
