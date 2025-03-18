@@ -7,13 +7,13 @@ const { serviceRouter } = require('./routes/service-route');
 // const { deleteRedis } = require('./redis/connection');
 const { connect } = require('./utilities/amqp');
 const createLogger = require('./utilities/logger');
-const { loadConfig } = require('./utilities/load-config');
+const { loadConfig, initCacheRefresh } = require('./utilities/load-config');
 const { checkDatabaseConnection } = require('./utilities/db-connection');
 const { registerCron } = require('./utilities/cron');
 const logger = createLogger('Server');
 const app = express();
 const cron = require('node-cron');
-const { storeDataStats } = require('./utilities/common_function');
+const { storeHourlyStats } = require('./utilities/common_function');
 const PORT = process.env.PORT || 4100;
 process.tracer  = tracer;
 
@@ -29,11 +29,12 @@ const initializeServer = async () => {
         cron.schedule('0 * * * *', async () => {
             console.log('Running storeHourlyStats function at the start of every hour');
             try {
-                await storeDataStats();
+                await storeHourlyStats();
             } catch (error) {
                 console.error('Error executing storeHourlyStats:', error);
             }
         });
+        initCacheRefresh();
         app.use('/operator', operatorRouter);
         app.use('/service', serviceRouter);
         app.listen(PORT, () => {

@@ -1,15 +1,22 @@
-const { read } = require("../../utilities/db-connection");
+const { default: axios } = require("axios");
+const { getWebhookUrl, generateUUIDv7 } = require("../../utilities/common_function");
+const { read, write } = require("../../utilities/db-connection");
+const { encryption } = require("../../utilities/ecryption-decryption");
 const { variableConfig } = require("../../utilities/load-config");
+const logger = require('../../utilities/logger');
+const thirdPartyLogger = logger('Void_Bets', 'jsonl');
+const failedThirdPartyLogger = logger('Failed_Void_Bets', 'jsonl');
+
 
 const getransaction = async (req, res) => {
     try {
-        let { limit = 100, offset = 0,txn_status ,  user_id, operator_id, game_id , txn_id, txn_ref_id, lobby_id, type, start_date, end_date} = req.query;
+        let { limit = 100, offset = 0, txn_status, user_id, operator_id, game_id, txn_id, txn_ref_id, lobby_id, type, start_date, end_date } = req.query;
         limit = parseInt(limit);
         offset = parseInt(offset);
         if (isNaN(limit) || isNaN(offset)) {
             return res.status(400).send({ status: false, msg: "Invalid limit or offset" });
         }
-        if((start_date && !end_date) || (!start_date && end_date)) return res.status(400).send({ status: false, msg: 'Both Start and End time is required to invoke date filter'});
+        if ((start_date && !end_date) || (!start_date && end_date)) return res.status(400).send({ status: false, msg: 'Both Start and End time is required to invoke date filter' });
 
         let sql = 'SELECT * FROM transaction';
         const params = [];
@@ -51,10 +58,10 @@ const getransaction = async (req, res) => {
             params.push(txn_status);
         }
 
-        if(start_date && end_date) {
+        if (start_date && end_date) {
             start_date = new Date(start_date).toISOString().slice(0, -5).replace('T', ' ');
             end_date = new Date(end_date).toISOString().slice(0, -5).replace('T', ' ');
-            whereConditions.push(`created_at >= ? AND created_at <= ?`); 
+            whereConditions.push(`created_at >= ? AND created_at <= ?`);
             params.push(start_date, end_date)
         };
 
@@ -64,8 +71,8 @@ const getransaction = async (req, res) => {
         sql += ' ORDER BY id DESC LIMIT ? OFFSET ?';
         params.push(limit, offset);
         const [data] = await read(sql, params);
-        const finalData = data.map(e=> {
-            e.game_name = (variableConfig.games_masters_list.find(game=> game.game_id == e.game_id))?.name || '';
+        const finalData = data.map(e => {
+            e.game_name = (variableConfig.games_masters_list.find(game => game.game_id == e.game_id))?.name || '';
             return e;
         });
         return res.status(200).send({ status: true, msg: "Find transaction", data: finalData });
@@ -80,7 +87,7 @@ const rollbacklist = async (req, res) => {
     try {
         const params = [];
         let whereConditions = [];
-        let { limit = 100, offset = 0, operator_id, game_id   , transaction_id} = req.query;
+        let { limit = 100, offset = 0, operator_id, game_id, transaction_id } = req.query;
         limit = parseInt(limit);
         offset = parseInt(offset);
         if (isNaN(limit) || isNaN(offset)) {
@@ -135,7 +142,7 @@ const getransactionbyuser = async (req, res) => {
         if (!user_id || !operator_id) {
             return res.status(400).send({ status: false, msg: "user_id and operator_id are required" });
         }
-        console.log({user_id , operator_id})
+        console.log({ user_id, operator_id })
         //let sql = 'SELECT * FROM transaction where user_id = ? and operator_id = ? limit 10';
         let sql = 'SELECT id,user_id,game_id,operator_id,txn_id,amount,lobby_id,txn_ref_id,description,txn_type,created_at FROM transaction WHERE user_id = ? AND operator_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?';
         const params = [user_id, operator_id, limit, offset];
@@ -144,7 +151,7 @@ const getransactionbyuser = async (req, res) => {
             e.game_name = (variableConfig.games_masters_list.find(game => game.game_id == e.game_id))?.name || '';
             return e;
         });
-        
+
         return res.status(200).send({ status: true, msg: "Find transaction", data: finalData });
     } catch (err) {
         console.error('Error:', err);
@@ -152,11 +159,104 @@ const getransactionbyuser = async (req, res) => {
     }
 };
 
+const voidBet = async (req, res) => {
+    try {
+        const txnRefId = req.body.ref_id;
+        const logDataReq = { txnRefId };
+        if (!txnRefId) return res.status(400).send({ status: false, msg: 'Invalid necassary paramters' });
+        const [[creditTxn]] = await read(`SELECT * FROM transaction WHERE txn_ref_id = ?`, [txnRefId]);
+        if (!creditTxn) return res.status(400).send({ status: false, msg: 'Transaction not found' });
+        Object.assign(logDataReq, { ...creditTxn });
+        if (creditTxn.txn_status != '2') return res.status(400).send({ status: false, msg: 'Credit transaction failed initally' });
+        let { user_id, operator_id, session_token, game_id, lobby_id } = creditTxn;
+        const [[existingVoidTrax]] = await read(`SELECT * FROM transaction WHERE txn_ref_id = ? and txn_status = '2'`, [creditTxn.txn_id]);
+        if(existingVoidTrax) return res.status(400).send({ status: false, msg: "Bet already voided for the given txn"});
+        const [[debitTxn]] = await read(`SELECT * FROM transaction WHERE txn_id = ?`, [txnRefId]);
+        if (!debitTxn) return res.status(400).send({ status: false, msg: 'Debit transaction not found for this Ref Id' });
+        if (debitTxn.txn_status != '2') return res.status(400).send({ status: false, msg: 'Debit Transaction was failed for this Ref Id' });
+        const debitAmount = Number(creditTxn.amount - debitTxn.amount).toFixed(2);
+        if(Number(debitAmount) <= 0) return res.status(400).send({ status: false, msg: 'Credit amount is less than Debit Amount'});
 
+        let gameData = (variableConfig.games_masters_list.find(e => e.game_id == game_id)) || null;
+        if (!gameData || !gameData.game_code) {
+            return res.status(400).send({ status: false, msg: "No game code is available for the game" });
+        };
+
+        const description = `${debitAmount} debited for voiding ${gameData.name} game bet with reference id ${creditTxn.txn_id}`;
+        const operatorData = variableConfig.operator_data.find(e=> e.user_id == operator_id);
+
+        if(!operatorData) return res.status(400).send({ status: false, msg: `Operator not found for this transaction`})
+
+        try {
+            operatorUrl = await getWebhookUrl(operator_id, "UPDATE_BALANCE");
+        } catch (err) {
+            return res.status(500).send({ status: false, msg: "Internal Server error" });
+        }
+
+        if (!operatorUrl) {
+            return res.status(400).send({ status: false, msg: "No URL configured for the event" });
+        }
+
+        const betData = {
+            amount: debitAmount,
+            txn_id: await generateUUIDv7(),
+            description,
+            txn_type: 0,
+            ip: '',
+            game_id: game_id,
+            user_id: user_id,
+            game_code: gameData.game_code
+        };
+
+        try {
+            encryptedData = await encryption(betData, operatorData.secret);
+        } catch (err) {
+            return res.status(500).send({ status: false, msg: "Internal Server error" });
+        }
+
+        const options = {
+            method: 'POST',
+            url: operatorUrl,
+            headers: {
+                'Content-Type': 'application/json',
+                token: session_token,
+                'x-user-id': user_id
+            },
+            timeout: 1000 * 3,
+            data: { data: encryptedData }
+        };
+
+        Object.assign(logDataReq, { options, betData });
+
+        try {
+            const response = await axios(options);
+            //Inserting Success queries to Database
+            thirdPartyLogger.info(JSON.stringify({ req: logDataReq, res: response?.data }));
+            await write("INSERT IGNORE INTO transaction (user_id, game_id, session_token, operator_id, txn_id, amount, lobby_id, txn_ref_id, description, txn_type, txn_status) VALUES (?)", [[user_id, game_id, session_token, operator_id, betData.txn_id, debitAmount, lobby_id, creditTxn.txn_id, description, '0', '2']]);
+            return res.status(200).send({ status: true, msg: 'Balance Voided successfully' });
+        } catch (err) {
+            const objForErr = {
+                req: logDataReq,
+                res4: JSON.parse(JSON.stringify(err?.response?.data || {})),
+                statusCode: "" + err?.response?.status + " " + err?.code,
+                message: err.message || "Unkown Error",
+                stack: err.stack
+            }
+            failedThirdPartyLogger.error(JSON.stringify(objForErr));
+            await write("INSERT IGNORE INTO transaction (user_id, game_id, session_token, operator_id, txn_id, amount, lobby_id, txn_ref_id, description, txn_type, txn_status) VALUES (?)", [[user_id, game_id, session_token, operator_id, betData.txn_id, debitAmount, lobby_id, creditTxn.txn_id, description, '0', '0']]);
+            return res.status(500).send({ status: false, msg: err?.response?.data?.message || "Internal Server error" });
+        }
+
+    } catch (err) {
+        console.error(`Error:::`, err);
+        return res.status(500).send({ status: false, msg: 'Internal Server Error' });
+    }
+}
 
 
 module.exports = {
     getransaction,
     rollbacklist,
-    getransactionbyuser
+    getransactionbyuser,
+    voidBet
 }

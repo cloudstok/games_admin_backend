@@ -48,7 +48,10 @@ const loadConfigTOAPI = async (req, res) => {
     }
 };
 
+const initCacheRefresh = () => {
+    setInterval(()=> loadConfig({ loadAll: true}), 5 * 60 * 1000);
+}
 
 
 
-module.exports = { variableConfig, loadConfig , loadConfigTOAPI};
+module.exports = { variableConfig, loadConfig , loadConfigTOAPI, initCacheRefresh};

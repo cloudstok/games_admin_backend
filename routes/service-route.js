@@ -4,7 +4,7 @@ const { serviceAddGame, getOperatorGame, getMasterListGames, getOperatorGamesFor
 const { getUserBalance, updateUserBalance, updateUserBalanceV2 } = require('../controller/service/wallet');
 const { verifyToken, auth } = require('../utilities/jsonwebtoken');
 const { activeUser, getUserDetail, getuserDataFromredis } = require('../controller/service/user');
-const { getransaction, rollbacklist, getransactionbyuser } = require('../controller/service/transaction');
+const { getransaction, rollbacklist, getransactionbyuser, voidBet } = require('../controller/service/transaction');
 const serviceRouter = require('express').Router();
 const { add_webhook, get_webhook, webhook, update_webhook_url } = require('../controller/service/webhook');
 const { bets, retryTransaction, operatorRollback, report } = require('../controller/service/bets');
@@ -18,6 +18,9 @@ const { upload } = require('../utilities/file_upload');
 //Service Panel routes
 serviceRouter.post('/register/user', verifyToken,  auth(['admin' , 'operator', 'superadmin']) , register);
 serviceRouter.post('/update/operator', verifyToken,  auth(['admin', 'superadmin']) , updateOperatorDetails);
+//=================Void Bet=========================================================//
+serviceRouter.post('/void/bet', verifyToken,  auth(['admin', 'superadmin']), voidBet);
+//=================================================================================//
 serviceRouter.post('/operator/updatestatus', verifyToken,  auth(['admin', 'superadmin']) , updateOperatorStatus);
 serviceRouter.post('/updategamestatus', verifyToken,  auth(['admin', 'superadmin']), updateGameStatus);
 serviceRouter.post('/user/login', login);
