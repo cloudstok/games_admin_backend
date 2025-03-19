@@ -18,9 +18,6 @@ const { upload } = require('../utilities/file_upload');
 //Service Panel routes
 serviceRouter.post('/register/user', verifyToken,  auth(['admin' , 'operator', 'superadmin']) , register);
 serviceRouter.post('/update/operator', verifyToken,  auth(['admin', 'superadmin']) , updateOperatorDetails);
-//=================Void Bet=========================================================//
-serviceRouter.post('/void/bet', verifyToken,  auth(['admin', 'superadmin']), voidBet);
-//=================================================================================//
 serviceRouter.post('/operator/updatestatus', verifyToken,  auth(['admin', 'superadmin']) , updateOperatorStatus);
 serviceRouter.post('/updategamestatus', verifyToken,  auth(['admin', 'superadmin']), updateGameStatus);
 serviceRouter.post('/user/login', login);
@@ -82,5 +79,8 @@ serviceRouter.put('/update/game/webhook' , update_webhook)
 
 //loadConfigTOAPI
 serviceRouter.post('/loadconfig' , auth(['admin' , 'superadmin', 'superadmin']) , loadConfigTOAPI)
+
+//Void Bet
+serviceRouter.post('/void/bet', verifyToken,  auth(['admin', 'superadmin']), voidBet);
 
 module.exports = { serviceRouter };

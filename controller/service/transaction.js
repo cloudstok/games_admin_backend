@@ -169,8 +169,8 @@ const voidBet = async (req, res) => {
         Object.assign(logDataReq, { ...creditTxn });
         if (creditTxn.txn_status != '2') return res.status(400).send({ status: false, msg: 'Credit transaction failed initally' });
         let { user_id, operator_id, session_token, game_id, lobby_id } = creditTxn;
-        const [[existingVoidTrax]] = await read(`SELECT * FROM transaction WHERE txn_ref_id = ? and txn_status = '2'`, [creditTxn.txn_id]);
-        if(existingVoidTrax) return res.status(400).send({ status: false, msg: "Bet already voided for the given txn"});
+        const [[existingVoidTrax]] = await read(`SELECT * FROM transaction WHERE txn_ref_id = ?`, [creditTxn.txn_id]);
+        if(existingVoidTrax && existingVoidTrax.txn_status == '2') return res.status(400).send({ status: false, msg: "Bet already voided for the given txn"});
         const [[debitTxn]] = await read(`SELECT * FROM transaction WHERE txn_id = ?`, [txnRefId]);
         if (!debitTxn) return res.status(400).send({ status: false, msg: 'Debit transaction not found for this Ref Id' });
         if (debitTxn.txn_status != '2') return res.status(400).send({ status: false, msg: 'Debit Transaction was failed for this Ref Id' });
@@ -199,7 +199,7 @@ const voidBet = async (req, res) => {
 
         const betData = {
             amount: debitAmount,
-            txn_id: await generateUUIDv7(),
+            txn_id: existingVoidTrax ? existingVoidTrax.txn_id : await generateUUIDv7(),
             description,
             txn_type: 0,
             ip: '',
@@ -232,8 +232,9 @@ const voidBet = async (req, res) => {
             const response = await axios(options);
             //Inserting Success queries to Database
             thirdPartyLogger.info(JSON.stringify({ req: logDataReq, res: response?.data }));
-            await write("INSERT IGNORE INTO transaction (user_id, game_id, session_token, operator_id, txn_id, amount, lobby_id, txn_ref_id, description, txn_type, txn_status) VALUES (?)", [[user_id, game_id, session_token, operator_id, betData.txn_id, debitAmount, lobby_id, creditTxn.txn_id, description, '0', '2']]);
-            return res.status(200).send({ status: true, msg: 'Balance Voided successfully' });
+            if(!existingVoidTrax) await write("INSERT IGNORE INTO transaction (user_id, game_id, session_token, operator_id, txn_id, amount, lobby_id, txn_ref_id, description, txn_type, txn_status) VALUES (?)", [[user_id, game_id, session_token, operator_id, betData.txn_id, debitAmount, lobby_id, creditTxn.txn_id, description, '0', '2']]);
+            else await write(`UPDATE transaction SET txn_status = '2' WHERE id = ?`, [existingVoidTrax.id]);
+            return res.status(200).send({ status: true, msg: 'Bet Voided successfully' });
         } catch (err) {
             const objForErr = {
                 req: logDataReq,
@@ -243,8 +244,8 @@ const voidBet = async (req, res) => {
                 stack: err.stack
             }
             failedThirdPartyLogger.error(JSON.stringify(objForErr));
-            await write("INSERT IGNORE INTO transaction (user_id, game_id, session_token, operator_id, txn_id, amount, lobby_id, txn_ref_id, description, txn_type, txn_status) VALUES (?)", [[user_id, game_id, session_token, operator_id, betData.txn_id, debitAmount, lobby_id, creditTxn.txn_id, description, '0', '0']]);
-            return res.status(500).send({ status: false, msg: err?.response?.data?.message || "Internal Server error" });
+            if(!existingVoidTrax) await write("INSERT IGNORE INTO transaction (user_id, game_id, session_token, operator_id, txn_id, amount, lobby_id, txn_ref_id, description, txn_type, txn_status) VALUES (?)", [[user_id, game_id, session_token, operator_id, betData.txn_id, debitAmount, lobby_id, creditTxn.txn_id, description, '0', '0']]);
+            return res.status(500).send({ status: false, msg: err?.response?.data?.message || "Operator Denied Void Request" });
         }
 
     } catch (err) {

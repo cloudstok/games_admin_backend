@@ -4,9 +4,9 @@ const { generateUUIDv7, getTransactionOptions, getTransactionForRollback, getLob
 const { encryption, decryption } = require('../../utilities/ecryption-decryption');
 const { variableConfig } = require('../../utilities/load-config');
 const createLogger = require('../../utilities/logger');
-const transactionRetryLogger  = createLogger('transactionRetry', 'jsonl');
+const transactionRetryLogger = createLogger('transactionRetry', 'jsonl');
 const manualRollbackLogger = createLogger('manualRollback', 'jsonl');
-const failedTransactionRetryLogger  = createLogger('failedTransactionRetry', 'jsonl');
+const failedTransactionRetryLogger = createLogger('failedTransactionRetry', 'jsonl');
 const failedManualRollbackLogger = createLogger('failedManualRollback', 'jsonl');
 
 // Get Bets from Game
@@ -42,7 +42,7 @@ async function fetchAllBets(data, token) {
 function removeNullValues(obj) {
     const filteredObj = {};
     for (const key in obj) {
-        if (obj[key] !== null && obj[key] !== undefined  && obj[key] !== 'null') {
+        if (obj[key] !== null && obj[key] !== undefined && obj[key] !== 'null') {
             filteredObj[key] = obj[key]; // Keep the key-value pair
         }
     }
@@ -55,7 +55,7 @@ const report = async (req, res) => {
         const data = await fetchAllreport(removeNullValues(req.query));
         return res.status(200).send({ status: true, msg: "data found", data })
     } catch (er) {
-        return res.status(500).send({ status: false, msg: "internal server Error"})
+        return res.status(500).send({ status: false, msg: "internal server Error" })
     }
 }
 
@@ -75,10 +75,10 @@ async function fetchAllreport(data) {
 
 async function executeTransactionQuery(responseData, requestData) {
     try {
-        if(requestData.txn_status == '0' && requestData.event == 'retry'){
+        if (requestData.txn_status == '0' && requestData.event == 'retry') {
             await write(`UPDATE transaction SET txn_status = '2' WHERE txn_id = ?`, [requestData.txn_id]);
             console.log(`Transaction updated`);
-        }else if(requestData.event == 'rollback'){
+        } else if (requestData.event == 'rollback') {
             const { user_id, token, operatorId, txn_id, amount, txn_ref_id, description, txn_type, game_id } = responseData;
             const lobby_id = description ? getLobbyFromDescription(description) : "";
             await write("INSERT INTO transaction (user_id, game_id , session_token , operator_id, txn_id, amount, lobby_id, txn_ref_id , description, txn_type, txn_status) VALUES (?)", [[user_id, game_id, token, operatorId, txn_id, amount, lobby_id, txn_ref_id, description, `${txn_type}`, '2']]);
@@ -95,25 +95,25 @@ const retryTransaction = async (req, res) => {
     try {
         const { user_id, game_id, session_token, operator_id, txn_id, amount, txn_ref_id, description, txn_type, txn_status, event } = req.body;
         let postData;
-        if(event == 'rollback' && txn_type == '2') return res.status(400).send({ status: false, msg: "Rollback can't be initiated on a rollbacked transaction"});
-        if(event == 'retry') postData = await getTransactionOptions({amount, txn_id, txn_ref_id, ip: req.headers['x-forwarded-for'], game_id, user_id, operatorId: operator_id, txn_type, token: session_token, description});
-        if(event == 'rollback') postData = await getTransactionForRollback({...req.body, ip: req.headers['x-forwarded-for']});
+        if (event == 'rollback' && txn_type == '2') return res.status(400).send({ status: false, msg: "Rollback can't be initiated on a rollbacked transaction" });
+        if (event == 'retry') postData = await getTransactionOptions({ amount, txn_id, txn_ref_id, ip: req.headers['x-forwarded-for'], game_id, user_id, operatorId: operator_id, txn_type, token: session_token, description });
+        if (event == 'rollback') postData = await getTransactionForRollback({ ...req.body, ip: req.headers['x-forwarded-for'] });
         const options = postData.options;
-        if(!options) return res.status(400).send({ status: false, msg: "Something went wrong while processing Transaction"});
-        try{
+        if (!options) return res.status(400).send({ status: false, msg: "Something went wrong while processing Transaction" });
+        try {
             const response = await axios(options);
-            if(response?.status == 200){
-                const logData = { req: req.body, options, res: response?.data};
-                event == 'retry' ? transactionRetryLogger.info(JSON.stringify(logData)) : manualRollbackLogger.info(JSON.stringify({...logData, rollbackData: postData.dbData}));
+            if (response?.status == 200) {
+                const logData = { req: req.body, options, res: response?.data };
+                event == 'retry' ? transactionRetryLogger.info(JSON.stringify(logData)) : manualRollbackLogger.info(JSON.stringify({ ...logData, rollbackData: postData.dbData }));
                 await executeTransactionQuery(postData.dbData, req.body);
-                return res.status(200).send({ status: true, msg: `Transaction ${event} execution successful`})
+                return res.status(200).send({ status: true, msg: `Transaction ${event} execution successful` })
             }
-        }catch(err){
-            const logData = { req: req.body, options, res: err?.response?.status};
-            event == 'retry' ? failedTransactionRetryLogger.error(JSON.stringify(logData)) : failedManualRollbackLogger.error(JSON.stringify({...logData, rollbackData: postData.dbData}));
-            return res.status(400).send({ status: false, msg: "Internal Server Error"});
+        } catch (err) {
+            const logData = { req: req.body, options, res: err?.response?.status };
+            event == 'retry' ? failedTransactionRetryLogger.error(JSON.stringify(logData)) : failedManualRollbackLogger.error(JSON.stringify({ ...logData, rollbackData: postData.dbData }));
+            return res.status(400).send({ status: false, msg: "Internal Server Error" });
         }
-          } catch (er) {
+    } catch (er) {
         console.error(er);
         return res.status(500).send({ status: false, msg: "internal server Error" });
     }
@@ -157,7 +157,7 @@ const operatorRollback = async (req, res) => {
     }
 };
 
-const insertRollbackData = async(userId, token, operatorId, transactionId, rollbackAmount, txn_ref_id, description, game_id) => {
+const insertRollbackData = async (userId, token, operatorId, transactionId, rollbackAmount, txn_ref_id, description, game_id) => {
     const lobby_id = description ? getLobbyFromDescription(description) : "";
     await write(`INSERT IGNORE INTO transaction (user_id, game_id, session_token, operator_id, txn_id, amount, lobby_id, txn_ref_id, description, txn_type, txn_status) VALUES (?)`, [[userId, game_id, token, operatorId, transactionId, rollbackAmount, lobby_id, txn_ref_id, description, '2', '2']])
 }

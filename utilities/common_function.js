@@ -102,30 +102,20 @@ const getRollbackOptions = async (data) => {
 
 const getTransactionOptions = async (data) => {
     const txn_type = 1;
-    const { amount, txn_id, txn_ref_id, ip, game_id, user_id,  token, description } = data;
+    const { amount, txn_id, txn_ref_id, ip, game_id, user_id, operatorId, token, description } = data;
     const game_code = (variableConfig.games_masters_list.find(e => e.game_id == game_id))?.game_code || null;
 
     if (!game_code) {
         return;
     }
 
-    let validateUser;
+    const operatorData = variableConfig.operator_data.find(e=> e.user_id == operatorId);
+    if(!operatorData) return res.status(400).send({ status: false, msg: `Operator not found for this transaction`})
 
-    try {
-        validateUser = JSON.parse(await getRedis(token));
-    } catch (err) {
-        return;
-    }
-
-    if (!validateUser) {
-        return false;
-    }
-
-    const {secret,operatorId} = validateUser;
     let encryptedData;
 
     try {
-        encryptedData = await encryption({ amount, txn_id, txn_ref_id, description, txn_type, ip, game_id, user_id, game_code }, secret);
+        encryptedData = await encryption({ amount, txn_id, txn_ref_id, description, txn_type, ip, game_id, user_id, game_code }, operatorData.secret);
     } catch (err) {
         return err;
     }
@@ -154,7 +144,7 @@ const getTransactionOptions = async (data) => {
         data: { data: encryptedData }
     };
 
-    const dbData = { txn_id, description, txn_ref_id, txn_type, amount, game_id, user_id, token, operatorId, secret, operatorUrl, game_code, ip };
+    const dbData = { txn_id, description, txn_ref_id, txn_type, amount, game_id, user_id, token, operatorId, secret: operatorData.secret, operatorUrl, game_code, ip };
     return { options: postOptions, dbData };
 }
 
@@ -177,23 +167,13 @@ const getTransactionForRollback = async (data) => {
         txn_decription = txn_decription.replace('debited', 'rollback-ed');
         const txn_amount = txn_type == '0' ? amount : debitTransaction?.amount;
 
-        let validateUser;
+        const operatorData = variableConfig.operator_data.find(e=> e.user_id == operator_id);
+        if(!operatorData) return res.status(400).send({ status: false, msg: `Operator not found for this transaction`})
 
-        try {
-            validateUser = JSON.parse(await getRedis(session_token));
-        } catch (err) {
-            return;
-        }
-
-        if (!validateUser) {
-            return false;
-        }
-
-        const secret = validateUser.secret;
         let encryptedData;
 
         try {
-            encryptedData = await encryption({ amount: txn_amount, txn_id: trx_id, txn_ref_id: trx_ref_id, description: txn_decription, txn_type: 2, ip, game_id, user_id, game_code }, secret);
+            encryptedData = await encryption({ amount: txn_amount, txn_id: trx_id, txn_ref_id: trx_ref_id, description: txn_decription, txn_type: 2, ip, game_id, user_id, game_code }, operatorData.secret);
         } catch (err) {
             return err;
         }
@@ -206,9 +186,8 @@ const getTransactionForRollback = async (data) => {
             return;
         }
 
-        if (!operatorUrl) {
-            return false;
-        }
+        if (!operatorUrl) return false;
+        
 
         const postOptions = {
             method: 'POST',
