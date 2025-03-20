@@ -1,8 +1,8 @@
 
 const { default: axios } = require("axios");
 const { read, write } = require("../../utilities/db-connection");
-const { getRedis } = require("../../utilities/redis-connection");
-const {variableConfig, loadConfig} = require('../../utilities/load-config')
+const { getRedis, setRedis } = require("../../utilities/redis-connection");
+const { variableConfig, loadConfig } = require('../../utilities/load-config')
 
 const addGame = async (req, res) => {
     try {
@@ -50,22 +50,26 @@ const findGame = async (req, res) => {
 const operatorFindGame = async (req, res) => {
     try {
         const { token } = req.headers;
-        const url = process.env.service_provider_url;
-        const config = {
-            method: 'GET',
-            url: `${url}/service/operator/game`,
-            headers: { token }
-        };
+        let validateUser;
         try {
-            const response = await axios(config);
-            if (response.status === 200) {
-                return res.status(200).send({ status: true, msg: "Games list fetched successfully", data: response.data });
-            } else {
-                return res.status(response.status).send({ status: false, msg: "Failed to fetch games list", data: response.data });
-            }
+            validateUser = JSON.parse(await getRedis(token));
         } catch (err) {
-            return res.status(500).json({ msg: "Internal server Error", status: false });
+            console.error("Error parsing Redis token:", err);
+            return res.status(400).send({ status: false, msg: "We've encountered an internal error" });
         }
+        if (!validateUser) {
+            return res.status(401).send({ status: false, msg: "Token expired or request timed out" });
+        }
+        const { operatorId } = validateUser;
+        const getCachedData = await getRedis(`OPGM:${operatorId}`);
+        if(getCachedData){
+            return res.status(200).send({ status: true, msg: 'Games list fetched successfully', data: JSON.parse(getCachedData)});
+        }
+        const sql = `SELECT * FROM operator_games AS og  INNER JOIN games_master_list AS gml  ON gml.game_id = og.game_id  WHERE operator_id = ? and og.is_active = 1`;
+        const [gamesList] = await write(sql, [operatorId]);
+        const resp = { status: true, msg: "Games fetched successfully for operator", data: gamesList };
+        await setRedis(`OPGM:${operatorId}`, JSON.stringify(resp), 60);
+        return res.status(200).send({ status: true, msg: 'Games list fetched successfully', data: resp});
     } catch (err) {
         return res.status(500).json({ msg: "Internal server Error", status: false });
     }
@@ -97,10 +101,10 @@ const addGeameWebhook = async (req, res) => {
             "INSERT INTO game_webhook_config (game_id, url, event) VALUES (?, ?, ?)",
             [game_id, url, event]
         );
-        await  loadConfig({loadgame_webhook : true})
-        return res.status(200).send({ 
-            status: true, 
-           msg  :  "webhook add successfully"
+        await loadConfig({ loadgame_webhook: true })
+        return res.status(200).send({
+            status: true,
+            msg: "webhook add successfully"
         });
     } catch (err) {
         console.error(err);
@@ -111,70 +115,49 @@ const addGeameWebhook = async (req, res) => {
 
 const update_webhook = async (req, res) => {
     try {
-      const { id, user_id, url, event , is_deleted } = req.body;
-      if (!id) {
-        return res.status(400).send({ status: false, msg: "Webhook ID is required for updating" });
-      }
-      const fieldsToUpdate = [];
-      const values = [];
-      if (user_id) {
-        fieldsToUpdate.push("user_id = ?");
-        values.push(user_id);
-      }
-      if (url) {
-        fieldsToUpdate.push("webhook_url = ?");
-        values.push(url);
-      }
-      if (event) {
-        fieldsToUpdate.push("event = ?");
-        values.push(event);
-      }
-      if (parseInt(is_deleted) == 0  || parseInt(is_deleted) == 1) {
-        const newStatus = is_deleted ? 0 : 1;
-        fieldsToUpdate.push("is_deleted = ?");
-        values.push(newStatus);
-      }
-      if (fieldsToUpdate.length === 0) {
-        return res.status(400).send({ status: false, msg: "No fields provided to update" });
-      }
-      values.push(id);
-      const sql = `UPDATE game_webhook_config SET ${fieldsToUpdate.join(", ")} WHERE id = ?`;
-      console.log({sql})
-      await write(sql, values);
-      await loadConfig({ loadgame_webhook: true });
-      return res.status(200).send({ status: true, msg: "Webhook updated successfully" });
+        const { id, user_id, url, event, is_deleted } = req.body;
+        if (!id) {
+            return res.status(400).send({ status: false, msg: "Webhook ID is required for updating" });
+        }
+        const fieldsToUpdate = [];
+        const values = [];
+        if (user_id) {
+            fieldsToUpdate.push("user_id = ?");
+            values.push(user_id);
+        }
+        if (url) {
+            fieldsToUpdate.push("webhook_url = ?");
+            values.push(url);
+        }
+        if (event) {
+            fieldsToUpdate.push("event = ?");
+            values.push(event);
+        }
+        if (parseInt(is_deleted) == 0 || parseInt(is_deleted) == 1) {
+            const newStatus = is_deleted ? 0 : 1;
+            fieldsToUpdate.push("is_deleted = ?");
+            values.push(newStatus);
+        }
+        if (fieldsToUpdate.length === 0) {
+            return res.status(400).send({ status: false, msg: "No fields provided to update" });
+        }
+        values.push(id);
+        const sql = `UPDATE game_webhook_config SET ${fieldsToUpdate.join(", ")} WHERE id = ?`;
+        await write(sql, values);
+        await loadConfig({ loadgame_webhook: true });
+        return res.status(200).send({ status: true, msg: "Webhook updated successfully" });
     } catch (err) {
-      console.error("Error updating webhook:", err);
-      return res.status(500).send({ status: false, msg: "Internal server error", error: err.message });
+        console.error("Error updating webhook:", err);
+        return res.status(500).send({ status: false, msg: "Internal server error", error: err.message });
     }
-  };
-  
-
-// const getGeameWebhook = async (req, res) => {
-//     try {
-    
-//         const updatedGameWebhookEvents = variableConfig.game_webhook_event.map(e => {
-//             const gameMaster = variableConfig.games_masters_list.find(el => el.game_id === e.game_id);
-//             const name = gameMaster ? gameMaster.name : null; // Handle cases where gameMaster is not found
-//             return { ...e, name }; // Add the name to the current event object
-//         });
-
-//         return res.status(200).send({
-//             status: true,
-//             data:  updatedGameWebhookEvents
-//         });
-//     } catch (err) {
-//         console.error(err); // Use error for better context
-//         return res.status(500).json({ msg: "Internal Server Error", status: false });
-//     }
-// };
+};
 
 
 const getGeameWebhook = async (req, res) => {
     try {
         const limit = parseInt(req.query.limit) || null;
         const offset = parseInt(req.query.offset) || 0;
-        const game_id = req.query.game_id ? parseInt(req.query.game_id) : null; 
+        const game_id = req.query.game_id ? parseInt(req.query.game_id) : null;
         const event = req.query.event || null;
 
         const updatedGameWebhookEvents = variableConfig.game_webhook_event.map(e => {
@@ -189,7 +172,7 @@ const getGeameWebhook = async (req, res) => {
             filteredData = filteredData.filter(e => e.game_id === game_id);
         }
         if (event) {
-            filteredData = filteredData.filter(e =>( e.event.toLowerCase() === event.toLowerCase()) && !e.is_deleted );
+            filteredData = filteredData.filter(e => (e.event.toLowerCase() === event.toLowerCase()) && !e.is_deleted);
         }
 
         const paginatedData = limit
@@ -200,8 +183,8 @@ const getGeameWebhook = async (req, res) => {
             status: true,
             data: paginatedData,
             total: filteredData.length,
-            limit: limit || filteredData.length, 
-            offset, 
+            limit: limit || filteredData.length,
+            offset,
         });
     } catch (err) {
         console.error(err);
@@ -211,4 +194,4 @@ const getGeameWebhook = async (req, res) => {
 
 
 
-module.exports = { addGame, findGame, operatorFindGame, getGeame , getGeameWebhook , addGeameWebhook   , update_webhook}
+module.exports = { addGame, findGame, operatorFindGame, getGeame, getGeameWebhook, addGeameWebhook, update_webhook }
