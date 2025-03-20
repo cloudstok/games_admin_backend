@@ -81,6 +81,6 @@ serviceRouter.put('/update/game/webhook' , update_webhook)
 serviceRouter.post('/loadconfig' , auth(['admin' , 'superadmin', 'superadmin']) , loadConfigTOAPI)
 
 //Void Bet
-serviceRouter.post('/void/bet', verifyToken,  auth(['admin', 'superadmin']), voidBet);
+serviceRouter.post('/void/bet', verifyToken, auth(['admin', 'superadmin']), voidBet);
 
 module.exports = { serviceRouter };
