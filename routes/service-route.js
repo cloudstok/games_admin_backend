@@ -1,6 +1,6 @@
 
 const { register, login, userLogin, getOperatorList, updateGameStatus, updateOperatorDetails, updateOperatorStatus } = require('../controller/service/operator');
-const { serviceAddGame, getOperatorGame, getMasterListGames, getOperatorGamesForService, addGameForOperator, serviceUpdateGame, getGameDetails } = require('../controller/service/game');
+const { serviceAddGame, getOperatorGame, getMasterListGames, getOperatorGamesForService, addGameForOperator, serviceUpdateGame, getGameDetails, getAllGameDetails } = require('../controller/service/game');
 const { getUserBalance, updateUserBalance, updateUserBalanceV2 } = require('../controller/service/wallet');
 const { verifyToken, auth } = require('../utilities/jsonwebtoken');
 const { activeUser, getUserDetail, getuserDataFromredis } = require('../controller/service/user');
@@ -37,6 +37,7 @@ serviceRouter.post('/user/login/:id', userLogin);
 serviceRouter.get('/operator/user/balance', getUserBalance);//
 serviceRouter.post('/operator/user/balance', updateUserBalance);
 serviceRouter.get('/game/details/:game_code', getGameDetails);
+serviceRouter.get('/all/games', getAllGameDetails);
 
 //v2 API's
 serviceRouter.post('/operator/user/balance/v2', updateUserBalanceV2);

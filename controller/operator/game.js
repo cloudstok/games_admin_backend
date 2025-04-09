@@ -97,7 +97,7 @@ const addGeameWebhook = async (req, res) => {
         }
 
         // Insert the data into the database
-        const [result] = await read(
+        const [result] = await write(
             "INSERT INTO game_webhook_config (game_id, url, event) VALUES (?, ?, ?)",
             [game_id, url, event]
         );

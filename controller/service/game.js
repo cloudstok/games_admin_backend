@@ -18,6 +18,17 @@ const getGameDetails = (req, res) => {
 }
 }
 
+const getAllGameDetails = (req, res) => {
+  try{
+    const gameDetails = variableConfig.games_masters_list;
+    if(!gameDetails) return res.status(400).json({ status: false, msg: "Games list doesn't exist"});
+    return res.status(200).json({ status: true, data: gameDetails});
+  } catch (err) {
+    console.error("Error fetching operator games:", err);
+    return res.status(500).json({ status: false, msg: "Internal server error" });
+}
+}
+
 const getOperatorGame = async (req, res) => {
     try {
         const token = req.headers.token;
@@ -185,5 +196,5 @@ const getMasterListGames = async (req, res) => {
     }
 }
 
-module.exports = { serviceAddGame, getGameDetails, getOperatorGame, getMasterListGames, getOperatorGamesForService, addGameForOperator, serviceUpdateGame};
+module.exports = { serviceAddGame, getGameDetails, getOperatorGame, getMasterListGames, getOperatorGamesForService, addGameForOperator, serviceUpdateGame, getAllGameDetails};
 
