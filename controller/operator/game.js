@@ -66,7 +66,7 @@ const operatorFindGame = async (req, res) => {
             return res.status(200).send({ status: true, msg: 'Games list fetched successfully', data: JSON.parse(getCachedData)});
         }
         const sql = `SELECT * FROM operator_games AS og  INNER JOIN games_master_list AS gml  ON gml.game_id = og.game_id  WHERE operator_id = ? and og.is_active = 1`;
-        const [gamesList] = await write(sql, [operatorId]);
+        const [gamesList] = await read(sql, [operatorId]);
         const resp = { status: true, msg: "Games fetched successfully for operator", data: gamesList };
         await setRedis(`OPGM:${operatorId}`, JSON.stringify(resp), 60);
         return res.status(200).send({ status: true, msg: 'Games list fetched successfully', data: resp});
@@ -74,6 +74,23 @@ const operatorFindGame = async (req, res) => {
         return res.status(500).json({ msg: "Internal server Error", status: false });
     }
 }
+
+const operatorGameByOperatorId = async (req, res) => {
+    try {
+        const operatorId = req.params.operator_id;
+        const getCachedData = await getRedis(`OPGMID:${operatorId}`);
+        if(getCachedData){
+            return res.status(200).send({ status: true, msg: 'Games list fetched successfully', data: JSON.parse(getCachedData)});
+        }
+        const sql = `SELECT * FROM operator_games AS og  INNER JOIN games_master_list AS gml  ON gml.game_id = og.game_id  WHERE operator_id = ? and og.is_active = 1`;
+        const [gamesList] = await read(sql, [operatorId]);
+        await setRedis(`OPGM:${operatorId}`, JSON.stringify(gamesList), 60);
+        return res.status(200).send({ status: true, msg: 'Games list fetched successfully', data: gamesList});
+    } catch (err) {
+        return res.status(500).json({ msg: "Internal server Error", status: false });
+    }
+}
+
 
 
 const getGeame = async (req, res) => {
@@ -194,4 +211,4 @@ const getGeameWebhook = async (req, res) => {
 
 
 
-module.exports = { addGame, findGame, operatorFindGame, getGeame, getGeameWebhook, addGeameWebhook, update_webhook }
+module.exports = { addGame, findGame, operatorFindGame, getGeame, getGeameWebhook, addGeameWebhook, update_webhook, operatorGameByOperatorId }

@@ -2,7 +2,7 @@ const { serviceAddGame } = require('../controller/service/game');
 const { addUser, userLogin, getUser, getuserDetail } = require('../controller/operator/user');
 const { verifyToken, auth } = require('../utilities/jsonwebtoken');
 const { addWallet, findWallet, userBalance, updateBalance, AllWallet } = require('../controller/operator/wallet');
-const { operatorFindGame, getGeame } = require('../controller/operator/game');
+const { operatorFindGame, getGeame, operatorGameByOperatorId } = require('../controller/operator/game');
 const { logout } = require('../controller/service/user');
 const { changePassword, OperatorchangePassword } = require('../controller/service/operator');
 const { rollbackCredit } = require('../controller/operator/bets');
@@ -16,6 +16,7 @@ operatorRouter.get('/wallet', auth(['admin' , 'operator', 'superadmin']) , AllWa
 operatorRouter.get('/user/balance', userBalance);
 operatorRouter.post('/user/balance', updateBalance);
 operatorRouter.get('/games/list', operatorFindGame);
+operatorRouter.get('/games/:operator_id', operatorGameByOperatorId);
 operatorRouter.get('/user/list', auth(['admin' , 'operator', 'superadmin']) ,  getUser);
 operatorRouter.get('/user/logout', logout);
 operatorRouter.get('/user/detail', getuserDetail);
