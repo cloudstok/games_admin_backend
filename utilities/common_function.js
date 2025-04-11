@@ -1,9 +1,28 @@
 const crypto = require('crypto');
 const { variableConfig } = require('./load-config');
-const { getRedis } = require('./redis-connection');
 const { encryption } = require('./ecryption-decryption');
 const axios = require('axios');
 const { read } = require('./db-connection');
+const pm2 = require('pm2');
+
+function restartQueues() {
+    pm2.connect((err) => {
+        if (err) {
+            console.error('Error connecting to PM2:', err);
+            process.exit(2);
+        }
+        pm2.restart('rabbitmq-consumer', (err, proc) => {
+            pm2.disconnect();
+
+            if (err) {
+                console.error('Error restarting process:', err);
+            } else {
+                console.log('Process restarted successfully:', proc);
+            }
+        })
+    })
+}
+
 async function generateRandomString(length) {
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     let randomString = "";
@@ -109,8 +128,8 @@ const getTransactionOptions = async (data) => {
         return;
     }
 
-    const operatorData = variableConfig.operator_data.find(e=> e.user_id == operatorId);
-    if(!operatorData) return res.status(400).send({ status: false, msg: `Operator not found for this transaction`})
+    const operatorData = variableConfig.operator_data.find(e => e.user_id == operatorId);
+    if (!operatorData) return res.status(400).send({ status: false, msg: `Operator not found for this transaction` })
 
     let encryptedData;
 
@@ -162,13 +181,13 @@ const getTransactionForRollback = async (data) => {
         }
         const trx_id = await generateUUIDv7();
         const trx_ref_id = txn_type == '0' ? txn_id : txn_ref_id;
-        const debitTransaction = txn_type == '1' ?  await getDebitTransaction(txn_ref_id): {};
+        const debitTransaction = txn_type == '1' ? await getDebitTransaction(txn_ref_id) : {};
         let txn_decription = txn_type == '0' ? description : debitTransaction?.description;
         txn_decription = txn_decription.replace('debited', 'rollback-ed');
         const txn_amount = txn_type == '0' ? amount : debitTransaction?.amount;
 
-        const operatorData = variableConfig.operator_data.find(e=> e.user_id == operator_id);
-        if(!operatorData) return res.status(400).send({ status: false, msg: `Operator not found for this transaction`})
+        const operatorData = variableConfig.operator_data.find(e => e.user_id == operator_id);
+        if (!operatorData) return res.status(400).send({ status: false, msg: `Operator not found for this transaction` })
 
         let encryptedData;
 
@@ -187,7 +206,7 @@ const getTransactionForRollback = async (data) => {
         }
 
         if (!operatorUrl) return false;
-        
+
 
         const postOptions = {
             method: 'POST',
@@ -235,8 +254,8 @@ async function getHourlyStats() {
     COUNT(DISTINCT CASE WHEN txn_ref_id IS NULL THEN txn_id END) as total_bets,
     count(distinct user_id) as active_users
 FROM transaction WHERE created_at >= (NOW() - INTERVAL 1 HOUR)  GROUP BY game_id, operator_id`;
-      const [statsData] = await read(StatsSQL);
-      return statsData;
+        const [statsData] = await read(StatsSQL);
+        return statsData;
     } catch (err) {
         console.error(`Err while generating stats is::`, err);
         return false;
@@ -249,7 +268,7 @@ async function storeHourlyStats() {
     const options = {
         'url': url,
         'Content-Type': 'application/json',
-        'method' : 'POST',
+        'method': 'POST',
         'data': statsData
     };
 
@@ -266,4 +285,4 @@ const getLobbyFromDescription = (line) => {
     return parts[parts.length - 1];
 }
 
-module.exports = { generateRandomString, generateRandomUserId, generateUUID, generateUUIDv7, getWebhookUrl, createOptions, getRollbackOptions, getTransactionOptions, storeHourlyStats, getTransactionForRollback, getLobbyFromDescription }
+module.exports = { generateRandomString, generateRandomUserId, generateUUID, generateUUIDv7, getWebhookUrl, createOptions, getRollbackOptions, getTransactionOptions, storeHourlyStats, getTransactionForRollback, getLobbyFromDescription, restartQueues }

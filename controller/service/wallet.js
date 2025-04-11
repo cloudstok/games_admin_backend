@@ -167,6 +167,9 @@ const updateUserBalanceV2 = async (req, res) => {
     if(!game_code){
         return res.status(400).send({ status: false, msg: "No game code is available for the game"});
     }
+
+    if(game_code == 'more_slots_ninja_cut') return res.status(400).send({ status: false, msg: "game is not active"});
+
     let logDataReq = {logId, token, body: req.body};
     updateBalanceLogger.info(JSON.stringify(logDataReq));
 

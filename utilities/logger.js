@@ -13,7 +13,6 @@ const colors = {
   reset: '\x1b[0m'
 };
 
-// Pretty-print function for console output
 function prettyPrint(log) {
   const timestamp = new Date(log.time).toISOString();
   const level = log.level;
@@ -21,7 +20,6 @@ function prettyPrint(log) {
   return `${timestamp} ${color}[${log.name}] ${level}: ${log.msg}${colors.reset}`;
 }
 
-// Stream for pretty-printing logs to the console
 const prettyStream = {
   write: (chunk) => {
     const log = JSON.parse(chunk);
@@ -29,25 +27,27 @@ const prettyStream = {
   }
 };
 
-// Create a JSONL stream
 const jsonlStream = (filePath) => fs.createWriteStream(filePath, { flags: 'a' });
 
+function getCurrentDate() {
+  return new Date().toISOString().split('T')[0];
+}
 
 function createLogger(moduleName, format = 'plain') {
   const logDir = 'logs';
-  const jsonlFilePath = path.join(logDir, `${moduleName}.jsonl`);
-  const logFilePath = path.join(logDir, `${moduleName}.log`);
 
   if (!fs.existsSync(logDir)) {
     fs.mkdirSync(logDir, { recursive: true });
   }
 
-  let logFileStream;
-  if (format === 'jsonl') {
-    logFileStream = jsonlStream(jsonlFilePath);
-  } else {
-    logFileStream = fs.createWriteStream(logFilePath, { flags: 'a' });
-  }
+  const date = getCurrentDate();
+  const fileExtension = format === 'jsonl' ? 'jsonl' : 'log';
+  const fileName = `${moduleName}-${date}.${fileExtension}`;
+  const logFilePath = path.join(logDir, fileName);
+
+  const logFileStream = format === 'jsonl'
+    ? jsonlStream(logFilePath)
+    : fs.createWriteStream(logFilePath, { flags: 'a' });
 
   return pino({
     formatters: {
