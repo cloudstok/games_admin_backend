@@ -42,7 +42,7 @@ function createLogger(moduleName, format = 'plain') {
 
   const date = getCurrentDate();
   const fileExtension = format === 'jsonl' ? 'jsonl' : 'log';
-  const fileName = `${moduleName}-${date}.${fileExtension}`;
+  const fileName = `${date}-${moduleName}.${fileExtension}`;
   const logFilePath = path.join(logDir, fileName);
 
   const logFileStream = format === 'jsonl'
