@@ -339,6 +339,13 @@ async function handleQueueMessage(queue, msg) {
             return;
         }
 
+        if(isNaN(Number(message.amount)) || Number(message.amount) <= 0) {
+            console.error(`Message encountered an error in ${queue}: ${JSON.stringify(message)}`);
+            failedThirdPartyLogger.error(JSON.stringify({req: logReqObj, res: 'Invalid transaction amount'}));
+            subChannel.ack(msg);
+            return;
+        };
+
         let postData;
         if (queue == v2Queues.rollbackV2  &&  !("options" in message) ) postData = await getRollbackOptions(message);
         else if (queue == v2Queues.cashoutV2 && !("options" in message) ) postData = await getTransactionOptions(message);
