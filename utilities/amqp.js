@@ -339,7 +339,7 @@ async function handleQueueMessage(queue, msg) {
             return;
         }
 
-        if(isNaN(Number(message.amount)) || Number(message.amount) <= 0) {
+        if(!("options" in message) && isNaN(Number(message.amount)) || Number(message.amount) <= 0) {
             console.error(`Message encountered an error in ${queue}: ${JSON.stringify(message)}`);
             failedThirdPartyLogger.error(JSON.stringify({req: logReqObj, res: 'Invalid transaction amount'}));
             subChannel.ack(msg);

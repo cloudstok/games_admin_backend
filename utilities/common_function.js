@@ -112,7 +112,7 @@ const getRollbackOptions = async (data) => {
             token,
             'x-user-id': user_id
         },
-        timeout: 1000 * 3,
+        timeout: 1000 * 10,
         data: { data: encryptedData }
     };
     const dbData = { txn_id: trx_id, description, txn_ref_id: txn_id, txn_type, amount, game_id, user_id, token, operatorId: data.operatorId };
@@ -159,7 +159,7 @@ const getTransactionOptions = async (data) => {
             token,
             'x-user-id': user_id
         },
-        timeout: 1000 * 3,
+        timeout: 1000 * 10,
         data: { data: encryptedData }
     };
 
