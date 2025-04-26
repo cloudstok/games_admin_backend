@@ -85,6 +85,6 @@ serviceRouter.post('/loadconfig', auth(['admin', 'superadmin', 'superadmin']), l
 serviceRouter.post('/void/bet', verifyToken, auth(['admin', 'superadmin']), voidBet);
 
 //Refresh Cache
-serviceRouter.get('/cache/refresh', refreshGameCache);
+serviceRouter.get('/cache/refresh', verifyToken, auth(['admin', 'superadmin']), refreshGameCache);
 
 module.exports = { serviceRouter };
