@@ -63,7 +63,7 @@ const get_webhook = async (req, res) => {
 
 const update_webhook_url = async (req, res) => {
     try {
-        const { id, user_id, url, event } = req.body;
+        const { id, user_id, url, event, is_deleted } = req.body;
 
         if (!id) {
             return res.status(400).send({ status: false, msg: "Webhook ID is required for updating" });
@@ -85,7 +85,11 @@ const update_webhook_url = async (req, res) => {
             fieldsToUpdate.push("event = ?");
             values.push(event);
         }
-
+        if (parseInt(is_deleted) == 0 || parseInt(is_deleted) == 1) {
+            const newStatus = is_deleted ? 0 : 1;
+            fieldsToUpdate.push("is_deleted = ?");
+            values.push(newStatus);
+        }
         if (fieldsToUpdate.length === 0) {
             return res.status(400).send({ status: false, msg: "No fields provided to update" });
         }

@@ -1,6 +1,6 @@
 
 const { register, login, userLogin, getOperatorList, updateGameStatus, updateOperatorDetails, updateOperatorStatus } = require('../controller/service/operator');
-const { serviceAddGame, getOperatorGame, getMasterListGames, getOperatorGamesForService, addGameForOperator, serviceUpdateGame, getGameDetails, getAllGameDetails } = require('../controller/service/game');
+const { serviceAddGame, getOperatorGame, getMasterListGames, getOperatorGamesForService, addGameForOperator, serviceUpdateGame, getGameDetails, getAllGameDetails, refreshGameCache } = require('../controller/service/game');
 const { getUserBalance, updateUserBalance, updateUserBalanceV2 } = require('../controller/service/wallet');
 const { verifyToken, auth } = require('../utilities/jsonwebtoken');
 const { activeUser, getUserDetail, getuserDataFromredis } = require('../controller/service/user');
@@ -10,7 +10,7 @@ const { add_webhook, get_webhook, webhook, update_webhook_url } = require('../co
 const { bets, retryTransaction, operatorRollback, report } = require('../controller/service/bets');
 const { addAgent, agentList, agentChangePassword, deleteAgent, resetAgentPassword } = require('../controller/service/agent');
 const { addAdmin, adminList, adminChangePassword, deleteAdmin } = require('../controller/service/admin');
-const { loadConfigTOAPI } = require('../utilities/load-config');
+const { loadConfigTOAPI, initCacheRefresh } = require('../utilities/load-config');
 const { getGeameWebhook, addGeameWebhook, update_webhook } = require('../controller/operator/game');
 const { upload } = require('../utilities/file_upload');
 
@@ -83,5 +83,8 @@ serviceRouter.post('/loadconfig', auth(['admin', 'superadmin', 'superadmin']), l
 
 //Void Bet
 serviceRouter.post('/void/bet', verifyToken, auth(['admin', 'superadmin']), voidBet);
+
+//Refresh Cache
+serviceRouter.get('/cache/refresh', refreshGameCache);
 
 module.exports = { serviceRouter };

@@ -50,6 +50,7 @@ const findGame = async (req, res) => {
 const operatorFindGame = async (req, res) => {
     try {
         const { token } = req.headers;
+        const genre = req.query.genre || 'general';
         let validateUser;
         try {
             validateUser = JSON.parse(await getRedis(token));
@@ -61,12 +62,12 @@ const operatorFindGame = async (req, res) => {
             return res.status(401).send({ status: false, msg: "Token expired or request timed out" });
         }
         const { operatorId } = validateUser;
-        const getCachedData = await getRedis(`OPGM:${operatorId}`);
+        const getCachedData = await getRedis(`OPGM:${genre}:${operatorId}`);
         if (getCachedData) {
             return res.status(200).send({ status: true, msg: 'Games list fetched successfully', data: JSON.parse(getCachedData) });
         }
-        const sql = `SELECT * FROM operator_games AS og  INNER JOIN games_master_list AS gml  ON gml.game_id = og.game_id  WHERE operator_id = ? and og.is_active = 1`;
-        const [gamesList] = await read(sql, [operatorId]);
+        const sql = `SELECT * FROM operator_games AS og  INNER JOIN games_master_list AS gml  ON gml.game_id = og.game_id  WHERE operator_id = ? and og.is_active = 1 and gml.genre = ?`;
+        const [gamesList] = await read(sql, [operatorId, genre]);
         const resp = { status: true, msg: "Games fetched successfully for operator", data: gamesList };
         await setRedis(`OPGM:${operatorId}`, JSON.stringify(resp), 60);
         return res.status(200).send({ status: true, msg: 'Games list fetched successfully', data: resp });
@@ -132,18 +133,18 @@ const addGeameWebhook = async (req, res) => {
 
 const update_webhook = async (req, res) => {
     try {
-        const { id, user_id, url, event, is_deleted } = req.body;
+        const { id, game_id, url, event, is_deleted } = req.body;
         if (!id) {
             return res.status(400).send({ status: false, msg: "Webhook ID is required for updating" });
         }
         const fieldsToUpdate = [];
         const values = [];
-        if (user_id) {
-            fieldsToUpdate.push("user_id = ?");
-            values.push(user_id);
+        if (game_id) {
+            fieldsToUpdate.push("game_id = ?");
+            values.push(game_id);
         }
         if (url) {
-            fieldsToUpdate.push("webhook_url = ?");
+            fieldsToUpdate.push("url = ?");
             values.push(url);
         }
         if (event) {
