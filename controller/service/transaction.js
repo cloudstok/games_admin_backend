@@ -1,5 +1,5 @@
 const { default: axios } = require("axios");
-const { getWebhookUrl, generateUUIDv7 } = require("../../utilities/common_function");
+const { getWebhookUrl, generateUUIDv7, getLobbyFromDescription } = require("../../utilities/common_function");
 const { read, write } = require("../../utilities/db-connection");
 const { encryption } = require("../../utilities/ecryption-decryption");
 const { variableConfig } = require("../../utilities/load-config");
@@ -254,10 +254,68 @@ const voidBet = async (req, res) => {
     }
 }
 
+const pndgTxnRetry = async(req, res) => {
+    try {
+        const { amount, txn_id, ip, game_id, user_id, operatorId, token, description, txn_type } = req.body;
+        const txn_ref_id = await generateUUIDv7();
+        const lobby_id = description ? getLobbyFromDescription(description) : "";
+        const game_code = (variableConfig.games_masters_list.find(e => e.game_id == game_id))?.game_code || null;
+ 
+        if (!game_code) return res.status(400).send({ status: false, msg: `game code not found` });
+    
+    
+        const operatorData = variableConfig.operator_data.find(e => e.user_id == operatorId);
+        if (!operatorData) return res.status(400).send({ status: false, msg: `Operator not found for this transaction` });
+    
+        let encryptedData;
+    
+        try {
+            encryptedData = await encryption({ amount, txn_id, txn_ref_id, description, txn_type, ip, game_id, user_id, game_code }, operatorData.secret);
+        } catch (err) {
+            return res.status(400).send({ status: false, msg: `Something went wrong!` });
+        }
+    
+        let operatorUrl;
+    
+        try {
+            operatorUrl = await getWebhookUrl(operatorId, "UPDATE_BALANCE");
+        } catch (err) {
+            return res.status(400).send({ status: false, msg: `Something went wrong!` });
+        }
+    
+        if (!operatorUrl) {
+            return res.status(400).send({ status: false, msg: `Operator url not found` });
+        }
+    
+        const postOptions = {
+            method: 'POST',
+            url: operatorUrl,
+            headers: {
+                'Content-Type': 'application/json',
+                token,
+                'x-user-id': user_id
+            },
+            timeout: 1000 * 10,
+            data: { data: encryptedData }
+        };
+        try {
+            await axios(postOptions);
+            await write("INSERT IGNORE INTO transaction (user_id, game_id, session_token, operator_id, txn_id, amount, lobby_id, txn_ref_id, description, txn_type, txn_status) VALUES (?)", [[user_id, game_id, token, operatorId, txn_id, amount, lobby_id, txn_ref_id, description, `${txn_type}`, '2']]);
+            return res.status(200).send({ status: true, msg: 'Credit transaction successful' });
+        } catch (err) {
+            await write("INSERT IGNORE INTO transaction (user_id, game_id, session_token, operator_id, txn_id, amount, lobby_id, txn_ref_id, description, txn_type, txn_status) VALUES (?)", [[user_id, game_id, token, operatorId, txn_id, amount, lobby_id, txn_ref_id, description, `${txn_type}`, '0']]);
+            return res.status(500).send({ status: false, msg: err?.response?.data?.message || "Internal Server error", options: { amount, txn_id, txn_ref_id, description, txn_type, ip, game_id, user_id, game_code } });
+        }
+    } catch (err) {
+        console.error(`Error:::`, err);
+        return res.status(500).send({ status: false, msg: 'Internal Server Error' });
+    }
+}
 
 module.exports = {
     getransaction,
     rollbacklist,
     getransactionbyuser,
-    voidBet
+    voidBet,
+    pndgTxnRetry
 }

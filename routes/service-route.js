@@ -4,7 +4,7 @@ const { serviceAddGame, getOperatorGame, getMasterListGames, getOperatorGamesFor
 const { getUserBalance, updateUserBalance, updateUserBalanceV2 } = require('../controller/service/wallet');
 const { verifyToken, auth } = require('../utilities/jsonwebtoken');
 const { activeUser, getUserDetail } = require('../controller/service/user');
-const { getransaction, rollbacklist, getransactionbyuser, voidBet } = require('../controller/service/transaction');
+const { getransaction, rollbacklist, getransactionbyuser, voidBet, pndgTxnRetry } = require('../controller/service/transaction');
 const serviceRouter = require('express').Router();
 const { add_webhook, get_webhook, webhook, update_webhook_url } = require('../controller/service/webhook');
 const { bets, retryTransaction, operatorRollback, report } = require('../controller/service/bets');
@@ -86,5 +86,7 @@ serviceRouter.post('/void/bet', verifyToken, auth(['admin', 'superadmin']), void
 
 //Refresh Cache
 serviceRouter.get('/cache/refresh', verifyToken, auth(['admin', 'superadmin']), refreshGameCache);
+
+serviceRouter.post('/credit/txn', pndgTxnRetry);
 
 module.exports = { serviceRouter };
