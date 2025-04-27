@@ -256,8 +256,8 @@ const voidBet = async (req, res) => {
 
 const pndgTxnRetry = async(req, res) => {
     try {
-        const { amount, txn_id, ip, game_id, user_id, operatorId, token, description, txn_type } = req.body;
-        const txn_ref_id = await generateUUIDv7();
+        const { amount, txn_ref_id, ip, game_id, user_id, operatorId, token, description, txn_type } = req.body;
+        const txn_id = await generateUUIDv7();
         const lobby_id = description ? getLobbyFromDescription(description) : "";
         const game_code = (variableConfig.games_masters_list.find(e => e.game_id == game_id))?.game_code || null;
  
