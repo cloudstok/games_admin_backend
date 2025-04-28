@@ -3,7 +3,7 @@ const { read, write } = require("../../utilities/db-connection");
 const { getRedis } = require("../../utilities/redis-connection");
 const { loadConfig, variableConfig } = require("../../utilities/load-config");
 const { uploadImage } = require("../../utilities/file_upload");
-const { restartQueues } = require("../../utilities/common_function");
+const { restartQueues, validateSlug } = require("../../utilities/common_function");
 
 
 const getGameDetails = (req, res) => {
@@ -111,10 +111,10 @@ const serviceAddGame = async (req, res) => {
       const data = await uploadImage(req.files)
       image = data?.Location
     }
-    const { name, url, backendUrl, companyName, code, genre, category } = req.body;
+    const { name, url, backendUrl, companyName, code, genre, category, slug } = req.body;
 
-    const sql = `INSERT IGNORE INTO games_master_list (name, game_category, url , backend_base_url, company_name, game_code , genre, image) VALUES (?,?,?,?,?,?,?,?)`;
-    await write(sql, [name, category, url, backendUrl, companyName, code, genre, image]);
+    const sql = `INSERT IGNORE INTO games_master_list (name, game_category, url , backend_base_url, company_name, game_code, game_slug, genre, image) VALUES (?,?,?,?,?,?,?,?,?)`;
+    await write(sql, [name, category, url, backendUrl, companyName, code, slug, genre, image]);
     await loadConfig({ loadGames: true });
     return res.status(200).send({ status: true, msg: "Game added successfully to the master's list" });
   } catch (err) {
@@ -212,5 +212,21 @@ const getMasterListGames = async (req, res) => {
   }
 }
 
-module.exports = { serviceAddGame, getGameDetails, getOperatorGame, getMasterListGames, refreshGameCache, getOperatorGamesForService, addGameForOperator, serviceUpdateGame, getAllGameDetails };
+const validateGameSlug = async(req, res) => {
+  try{
+    const {gameName, slug} = req.body;
+    if(!gameName || !slug) return res.status(400).send({ status: false, msg: 'Missing mandatory parameters'}); 
+    if(slug.length < 7) return res.status(400).send({ status: false, msg: 'Invalid Slug Length'});
+    const isSlugExist = variableConfig.games_masters_list.find(e=> e.game_slug == slug);
+    if(isSlugExist) return res.status(400).send({ status: false, msg: "Slug already selected for another game"});
+    const isSlugValid = validateSlug(slug, gameName);
+    if(isSlugValid) return res.status(200).send({ status: true, msg: 'Slug validated'});
+    else return res.status(400).send({ status: false, msg: 'Slug validation failed'});
+  } catch (err) {
+    console.error("Error creating game slug:", err);
+    return res.status(500).json({ status: false, msg: "Internal server error", error: err.message });
+  }
+}
+
+module.exports = { serviceAddGame, getGameDetails, validateGameSlug, getOperatorGame, getMasterListGames, refreshGameCache, getOperatorGamesForService, addGameForOperator, serviceUpdateGame, getAllGameDetails };
 

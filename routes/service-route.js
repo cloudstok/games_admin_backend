@@ -1,6 +1,6 @@
 
 const { register, login, userLogin, getOperatorList, updateGameStatus, updateOperatorDetails, updateOperatorStatus } = require('../controller/service/operator');
-const { serviceAddGame, getOperatorGame, getMasterListGames, getOperatorGamesForService, addGameForOperator, serviceUpdateGame, getGameDetails, getAllGameDetails, refreshGameCache } = require('../controller/service/game');
+const { serviceAddGame, getOperatorGame, getMasterListGames, getOperatorGamesForService, addGameForOperator, serviceUpdateGame, getGameDetails, getAllGameDetails, refreshGameCache, validateGameSlug } = require('../controller/service/game');
 const { getUserBalance, updateUserBalance, updateUserBalanceV2 } = require('../controller/service/wallet');
 const { verifyToken, auth } = require('../utilities/jsonwebtoken');
 const { activeUser, getUserDetail } = require('../controller/service/user');
@@ -28,6 +28,7 @@ serviceRouter.post('/update/register/game', verifyToken, auth(['admin', 'operato
 serviceRouter.get('/games/list', verifyToken, auth(['admin', 'operator', 'agent', 'superadmin']), getMasterListGames);
 serviceRouter.get('/game/operator/:operator_id', verifyToken, auth(['admin', 'operator', 'superadmin']), getOperatorGamesForService);
 serviceRouter.post('/register/operator/game', verifyToken, auth(['admin', 'operator', 'superadmin']), addGameForOperator);
+serviceRouter.post('/validate/slug', verifyToken, auth(['admin', 'superadmin']), validateGameSlug);
 
 //Call from Operator's API
 serviceRouter.get('/operator/game', getOperatorGame);

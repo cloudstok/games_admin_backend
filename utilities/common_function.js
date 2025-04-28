@@ -285,4 +285,32 @@ const getLobbyFromDescription = (line) => {
     return parts[parts.length - 1];
 }
 
-module.exports = { generateRandomString, generateRandomUserId, generateUUID, generateUUIDv7, getWebhookUrl, createOptions, getRollbackOptions, getTransactionOptions, storeHourlyStats, getTransactionForRollback, getLobbyFromDescription, restartQueues }
+
+function validateSlug(slug, gameName) {
+    const cleanGameName = gameName.replace(/\s+/g, '').toLowerCase();
+    const cleanSlug = slug.replace(/\s+/g, '').toLowerCase();
+
+    if (cleanGameName.length < 7) return cleanSlug.includes(cleanGameName);
+    else {
+        let seqIndex = 0;
+
+        for (let i = 0; i < cleanSlug.length; i++) {
+            if (cleanSlug[i] === cleanGameName[seqIndex]) {
+                seqIndex++;
+            }
+            if (seqIndex === cleanGameName.length) break;
+        }
+
+        let slugIndex = 0, nameIndex = 0;
+        while (slugIndex < cleanSlug.length && nameIndex < cleanGameName.length) {
+            if (cleanSlug[slugIndex] === cleanGameName[nameIndex]) {
+                slugIndex++;
+            }
+            nameIndex++;
+        }
+        return slugIndex === cleanSlug.length;
+    }
+}
+
+
+module.exports = { validateSlug, generateRandomString, generateRandomUserId, generateUUID, generateUUIDv7, getWebhookUrl, createOptions, getRollbackOptions, getTransactionOptions, storeHourlyStats, getTransactionForRollback, getLobbyFromDescription, restartQueues }
