@@ -216,7 +216,7 @@ const validateGameSlug = async(req, res) => {
   try{
     const {gameName, slug} = req.body;
     if(!gameName || !slug) return res.status(400).send({ status: false, msg: 'Missing mandatory parameters'}); 
-    if(slug.length < 7) return res.status(400).send({ status: false, msg: 'Invalid Slug Length'});
+    if(slug.length != 7) return res.status(400).send({ status: false, msg: 'Invalid Slug Length'});
     const isSlugExist = variableConfig.games_masters_list.find(e=> e.game_slug == slug);
     if(isSlugExist) return res.status(400).send({ status: false, msg: "Slug already selected for another game"});
     const isSlugValid = validateSlug(slug, gameName);
