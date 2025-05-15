@@ -68,10 +68,44 @@ const operatorFindGame = async (req, res) => {
         }
         const sql = `SELECT * FROM operator_games AS og  INNER JOIN games_master_list AS gml  ON gml.game_id = og.game_id  WHERE operator_id = ? and og.is_active = 1 and gml.genre = ?`;
         const [gamesList] = await read(sql, [operatorId, genre]);
+        if(genre == 'mini'){
+            gamesList.map(game=> {
+                game.count = Math.floor(Math.random() * (200 - 50 + 1)) + 50;
+            })
+        }
         const resp = { status: true, msg: "Games fetched successfully for operator", data: gamesList };
         await setRedis(`OPGM:${operatorId}`, JSON.stringify(resp), 60);
         return res.status(200).send({ status: true, msg: 'Games list fetched successfully', data: resp });
     } catch (err) {
+        return res.status(500).json({ msg: "Internal server Error", status: false });
+    }
+}
+
+const operatorGameCodes = async (req, res) => {
+    try {
+        const { token } = req.headers;
+        let validateUser;
+        try {
+            validateUser = JSON.parse(await getRedis(token));
+        } catch (err) {
+            console.error("Error parsing Redis token:", err);
+            return res.status(400).send({ status: false, msg: "We've encountered an internal error" });
+        }
+        if (!validateUser) {
+            return res.status(401).send({ status: false, msg: "Token expired or request timed out" });
+        }
+        const { operatorId } = validateUser;
+        const getCachedData = await getRedis(`GMCD:${operatorId}`);
+        if (getCachedData) {
+            return res.status(200).send({ status: true, msg: 'Games list fetched successfully', data: JSON.parse(getCachedData) });
+        }
+        const sql = `SELECT game_code FROM operator_games AS og  INNER JOIN games_master_list AS gml  ON gml.game_id = og.game_id  WHERE operator_id = ? and og.is_active = 1`;
+        const [gamesList] = await read(sql, [operatorId]);
+        const finalData = gamesList.map(e=> e.game_code);
+        await setRedis(`OPGM:${operatorId}`, JSON.stringify(finalData), 60);
+        return res.status(200).send({ status: true, msg: 'Games list fetched successfully', data: finalData });
+    } catch (err) {
+        console.log(err);
         return res.status(500).json({ msg: "Internal server Error", status: false });
     }
 }
@@ -212,4 +246,4 @@ const getGeameWebhook = async (req, res) => {
 
 
 
-module.exports = { addGame, findGame, operatorFindGame, getGeame, getGeameWebhook, addGeameWebhook, update_webhook, operatorGameByOperatorId }
+module.exports = { addGame, findGame, operatorFindGame, getGeame, getGeameWebhook, addGeameWebhook, update_webhook, operatorGameByOperatorId, operatorGameCodes }

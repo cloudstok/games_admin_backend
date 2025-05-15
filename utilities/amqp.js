@@ -298,7 +298,7 @@ async function handleRetryOrMoveToNextQueue(currentQueue, message, originalMsg, 
         console.log(`Retrying message in ${currentQueue} (retry #${retries})`);
         setTimeout(async () => {
             try {
-                await sendToQueue('', currentQueue, JSON.stringify(message), RETRY_DELAY_MS*60, retries);
+                await sendToQueue('', currentQueue, JSON.stringify(message), RETRY_DELAY_MS * 60, retries);
                 subChannel.ack(originalMsg);
             } catch (error) {
                 console.error(`Failed to retry message in ${currentQueue}: ${error.message}`);
@@ -339,16 +339,16 @@ async function handleQueueMessage(queue, msg) {
             return;
         }
 
-        if(!("options" in message) && isNaN(Number(message.amount)) || Number(message.amount) <= 0) {
+        if (!("options" in message) && isNaN(Number(message.amount)) || Number(message.amount) <= 0) {
             console.error(`Message encountered an error in ${queue}: ${JSON.stringify(message)}`);
-            failedThirdPartyLogger.error(JSON.stringify({req: logReqObj, res: 'Invalid transaction amount'}));
+            failedThirdPartyLogger.error(JSON.stringify({ req: logReqObj, res: 'Invalid transaction amount' }));
             subChannel.ack(msg);
             return;
         };
 
         let postData;
-        if (queue == v2Queues.rollbackV2  &&  !("options" in message) ) postData = await getRollbackOptions(message);
-        else if (queue == v2Queues.cashoutV2 && !("options" in message) ) postData = await getTransactionOptions(message);
+        if (queue == v2Queues.rollbackV2 && !("options" in message)) postData = await getRollbackOptions(message);
+        else if (queue == v2Queues.cashoutV2 && !("options" in message)) postData = await getTransactionOptions(message);
         else postData = message;
         let options = postData.options;
         try {
@@ -377,13 +377,13 @@ async function handleQueueMessage(queue, msg) {
             }
         } catch (err) {
             const objForErr = {
-                timestamp:Date.now(),
+                timestamp: Date.now(),
                 req: msg.content.toString(),
-                res3: JSON.parse(JSON.stringify(err?.response?.data|| err)),
+                res3: JSON.parse(JSON.stringify(err?.response?.data || err)),
                 postData,
                 queue,
                 retries,
-                statusCode: ""+err?.response?.status+ " "+ err?.code,
+                statusCode: "" + err?.response?.status + " " + err?.code,
                 message: err?.message || "Unkown Error",
                 stack: err?.stack || "No Stack for the request"
             }

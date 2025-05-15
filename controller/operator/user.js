@@ -45,7 +45,6 @@ const insertUserIntoDatabase = async (id, name, userId, hashedPassword, currency
 const userLogin = async (req, res) => {
     try {
         const { userId, password } = req.body;
-       
         const { pub_key, secret } = await getOperatorCredentials();
         const user = await getUserDetails(userId);
         if (!user) {
@@ -160,18 +159,18 @@ const fetchUserData = async (operatorId, limit, offset) => {
 const getuserDetail = async (req, res) => {
     try {
         const token = getTokenFromHeaders(req.headers);
-        if(!token) return res.status(400).send({ status: false, msg: "Necassary token missing in headers"});
+        if (!token) return res.status(400).send({ status: false, msg: "Necassary token missing in headers" });
         const validateUser = await getUserDataFromRedis(token);
-        if(!validateUser) return res.status(400).send({ status: false, msg: "Invalid User Details"});
+        if (!validateUser) return res.status(400).send({ status: false, msg: "Invalid User Details" });
         const { userId, operatorId } = validateUser;
         const user = await fetchUserDetailsFromDatabase(userId);
         if (!user) {
-            return res.status(400).send({ status: false, msg:  "No User found with this id" });
+            return res.status(400).send({ status: false, msg: "No User found with this id" });
         }
-        return res.status(200).send({ 
-            status: true, 
-            msg: "User details retrieved successfully", 
-            user: { ...user, operatorId } 
+        return res.status(200).send({
+            status: true,
+            msg: "User details retrieved successfully",
+            user: { ...user, operatorId }
         });
     } catch (err) {
         console.error(err);

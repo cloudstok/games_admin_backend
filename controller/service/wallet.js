@@ -168,7 +168,7 @@ const updateUserBalanceV2 = async (req, res) => {
         return res.status(400).send({ status: false, msg: "No game code is available for the game" });
     }
 
-    if(isNaN(Number(amount)) || Number(amount) <= 0) return res.status(400).send({ status: false, msg: 'Invalid transaction amount'});
+    if (isNaN(Number(amount)) || Number(amount) <= 0) return res.status(400).send({ status: false, msg: 'Invalid transaction amount' });
 
     let logDataReq = { logId, token, body: req.body };
     updateBalanceLogger.info(JSON.stringify(logDataReq));
@@ -212,6 +212,7 @@ const updateUserBalanceV2 = async (req, res) => {
     if (txnRefId) betData.txn_ref_id = txnRefId;
     let encryptedData;
     try {
+        //console.log({ betData, secret })
         encryptedData = await encryption(betData, secret);
     } catch (err) {
         failedUpdateBalanceLogger.error(JSON.stringify({ req: logDataReq, res: 'Error while encrypting data' }));

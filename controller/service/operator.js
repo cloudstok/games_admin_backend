@@ -100,19 +100,19 @@ const updateOperatorDetails = async (req, res) => {
     if (pub_key) {
       fields.push("pub_key = ?");
       const publicKey = await generateRandomString(12);
-      Object.assign(returnData, {publicKey});
+      Object.assign(returnData, { publicKey });
       values.push(publicKey);
     }
     if (secret) {
       fields.push("secret = ?");
       const secretKey = await generateRandomString(32);
-      Object.assign(returnData, {secretKey});
+      Object.assign(returnData, { secretKey });
       values.push(secretKey);
     }
     if (password) {
       fields.push("password = ?");
       const hashedPassword = await hashPassword(password);
-      Object.assign(returnData, {password});
+      Object.assign(returnData, { password });
       values.push(hashedPassword);
     }
 
@@ -123,7 +123,7 @@ const updateOperatorDetails = async (req, res) => {
     const query = `UPDATE operator SET ${fields.join(", ")} WHERE id = ?`;
     values.push(req.query.id);
     await write(query, values);
-    await loadConfig({ loadAll: true});
+    await loadConfig({ loadAll: true });
     return res.status(200).send({ status: true, msg: "Operator details updated successfully", updatedData: returnData });
 
   } catch (error) {

@@ -13,8 +13,7 @@ const app = express();
 const cron = require('node-cron');
 const { storeHourlyStats, restartQueues } = require('./utilities/common_function');
 const PORT = process.env.PORT || 4100;
-process.tracer  = tracer;
-
+process.tracer = tracer;
 app.use(cors());
 app.use(express.json());
 
@@ -22,7 +21,7 @@ const initializeServer = async () => {
     try {
         // Loading All App Dependencies
         await Promise.all([checkDatabaseConnection(), connect()]);
-        await loadConfig({ loadAll: true});
+        await loadConfig({ loadAll: true });
         cron.schedule('0 * * * *', async () => {
             console.log('Running storeHourlyStats function at the start of every hour');
             try {
