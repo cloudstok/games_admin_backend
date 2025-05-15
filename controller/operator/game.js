@@ -97,13 +97,13 @@ const operatorGameCodes = async (req, res) => {
         const { operatorId } = validateUser;
         const getCachedData = await getRedis(`GMCD:${operatorId}`);
         if (getCachedData) {
-            return res.status(200).send({ status: true, msg: 'Games list fetched successfully', data: JSON.parse(getCachedData) });
+            return res.status(200).send({ status: true, msg: 'Games codes fetched successfully', data: JSON.parse(getCachedData) });
         }
         const sql = `SELECT game_code FROM operator_games AS og  INNER JOIN games_master_list AS gml  ON gml.game_id = og.game_id  WHERE operator_id = ? and og.is_active = 1`;
         const [gamesList] = await read(sql, [operatorId]);
         const finalData = gamesList.map(e=> e.game_code);
         await setRedis(`OPGM:${operatorId}`, JSON.stringify(finalData), 60);
-        return res.status(200).send({ status: true, msg: 'Games list fetched successfully', data: finalData });
+        return res.status(200).send({ status: true, msg: 'Games codes fetched successfully', data: finalData });
     } catch (err) {
         console.log(err);
         return res.status(500).json({ msg: "Internal server Error", status: false });
