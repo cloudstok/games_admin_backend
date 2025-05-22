@@ -155,6 +155,7 @@ const updateUserBalance = async (req, res) => {
 };
 
 const updateUserBalanceV2 = async (req, res) => {
+    const initTime = Date.now();
     const logId = await generateUUIDv7();
     const token = req.headers.token;
     if (!token) {
@@ -230,6 +231,9 @@ const updateUserBalanceV2 = async (req, res) => {
         timeout: 1000 * 3,
         data: { data: encryptedData }
     };
+
+    const reqTimeDiff = (Date.now() - initTime) / 1000;
+    if(reqTimeDiff > 1) return res.status(500).send({ status: false, msg: 'Request Timed Out!'});
 
     try {
         const response = await axios(options);
