@@ -197,14 +197,6 @@ const userLogin = async (req, res) => {
     let { user_id, pub_key, secret, url } = getOperator;
     const decodeData = await decryption(data, secret);
     const token = await generateUUIDv7();
-    // let user = await getRedis('users')
-    // if (user) {
-    //   user = JSON.parse(user);
-    //   user.push(token)
-    //   await setRedis('users', JSON.stringify(user), 3600 * 24)
-    // } else {
-    //   await setRedis('users', JSON.stringify([token]), 3600 * 24)
-    // }
     url = decodeData?.url ? decodeData.url : url;
     await setRedis(token, JSON.stringify({ userId: decodeData.user_id, operatorId: user_id, pub_key, secret, url, createdAt: Date.now() }), 3600 * 16);
     return res.status(200).send({ status: true, msg: "User authenticated", token });
