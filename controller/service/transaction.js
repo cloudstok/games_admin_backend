@@ -254,6 +254,95 @@ const voidBet = async (req, res) => {
     }
 }
 
+const rollbackBet = async (req, res) => {
+    try {
+        const txnId = req.params.txn_id;
+        const logDataReq = { txnId };
+        if (!txnId) return res.status(400).send({ status: false, msg: 'Invalid necassary paramters' });
+        const [[debitTxn]] = await read(`SELECT * FROM transaction WHERE txn_id = ?`, [txnId]);
+        if (!debitTxn) return res.status(400).send({ status: false, msg: 'Transaction not found' });
+        Object.assign(logDataReq, { ...debitTxn });
+        if (debitTxn.txn_status != '2') return res.status(400).send({ status: false, msg: 'Debit transaction failed initally' });
+        let { user_id, operator_id, session_token, game_id, lobby_id, amount, description } = debitTxn;
+        const [[existingRollbackTrax]] = await read(`SELECT * FROM transaction WHERE txn_ref_id = ?`, [debitTxn.txn_id]);
+        if(existingRollbackTrax && existingRollbackTrax.txn_status == '2') return res.status(400).send({ status: false, msg: "Bet already rollback-ed for the given txn"});
+
+        let gameData = (variableConfig.games_masters_list.find(e => e.game_id == game_id)) || null;
+        if (!gameData || !gameData.game_code) {
+            return res.status(400).send({ status: false, msg: "No game code is available for the game" });
+        };
+
+        const rollbackDescription = description.replace('debited', 'rollback-ed');
+        const operatorData = variableConfig.operator_data.find(e=> e.user_id == operator_id);
+
+        if(!operatorData) return res.status(400).send({ status: false, msg: `Operator not found for this transaction`})
+
+        try {
+            operatorUrl = await getWebhookUrl(operator_id, "UPDATE_BALANCE");
+        } catch (err) {
+            return res.status(500).send({ status: false, msg: "Internal Server error" });
+        }
+
+        if (!operatorUrl) {
+            return res.status(400).send({ status: false, msg: "No URL configured for the event" });
+        }
+
+        const betData = {
+            amount,
+            txn_id: await generateUUIDv7(),
+            description: rollbackDescription,
+            txn_type: 2,
+            ip: '',
+            game_id: game_id,
+            user_id: user_id,
+            game_code: gameData.game_code
+        };
+
+        try {
+            encryptedData = await encryption(betData, operatorData.secret);
+        } catch (err) {
+            return res.status(500).send({ status: false, msg: "Internal Server error" });
+        }
+
+        const options = {
+            method: 'POST',
+            url: operatorUrl,
+            headers: {
+                'Content-Type': 'application/json',
+                token: session_token,
+                'x-user-id': user_id
+            },
+            timeout: 1000 * 3,
+            data: { data: encryptedData }
+        };
+
+        Object.assign(logDataReq, { options, betData });
+
+        try {
+            const response = await axios(options);
+            //Inserting Success queries to Database
+            thirdPartyLogger.info(JSON.stringify({ req: logDataReq, res: response?.data }));
+            await write("INSERT IGNORE INTO transaction (user_id, game_id, session_token, operator_id, txn_id, amount, lobby_id, txn_ref_id, description, txn_type, txn_status) VALUES (?)", [[user_id, game_id, session_token, operator_id, betData.txn_id, amount, lobby_id, debitTxn.txn_id, description, '2', '2']]);
+            return res.status(200).send({ status: true, msg: 'Bet rollback-ed successfully' });
+        } catch (err) {
+            const objForErr = {
+                req: logDataReq,
+                res4: JSON.parse(JSON.stringify(err?.response?.data || {})),
+                statusCode: "" + err?.response?.status + " " + err?.code,
+                message: err.message || "Unkown Error",
+                stack: err.stack
+            }
+            failedThirdPartyLogger.error(JSON.stringify(objForErr));
+            await write("INSERT IGNORE INTO transaction (user_id, game_id, session_token, operator_id, txn_id, amount, lobby_id, txn_ref_id, description, txn_type, txn_status) VALUES (?)", [[user_id, game_id, session_token, operator_id, betData.txn_id, amount, lobby_id, debitTxn.txn_id, description, '2', '0']]);
+            return res.status(500).send({ status: false, msg: err?.response?.data?.message || "Operator Denied Void Request" });
+        }
+
+    } catch (err) {
+        console.error(`Error:::`, err);
+        return res.status(500).send({ status: false, msg: 'Internal Server Error' });
+    }
+}
+
 const pndgTxnRetry = async(req, res) => {
     try {
         const { amount, txn_ref_id, ip, game_id, user_id, operatorId, token, description, txn_type } = req.body;
@@ -317,5 +406,6 @@ module.exports = {
     rollbacklist,
     getransactionbyuser,
     voidBet,
-    pndgTxnRetry
+    pndgTxnRetry,
+    rollbackBet
 }
