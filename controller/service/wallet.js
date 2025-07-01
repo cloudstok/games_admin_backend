@@ -13,7 +13,6 @@ const failedUpdateBalanceLogger = getLogger('Failed_User_Update_Balance', 'jsonl
 const thirdPartyLogger = getLogger('Third_Party_Data', 'jsonl');
 const failedThirdPartyLogger = getLogger('Failed_Third_Party_Data', 'jsonl');
 
-
 const getUserBalance = async (req, res) => {
     const logId = await generateUUIDv7();
     const token = req.headers.token;
@@ -74,8 +73,6 @@ const getUserBalance = async (req, res) => {
         return res.status(500).send({ status: false, msg: "Internal Server error" });
     }
 };
-
-
 
 const updateUserBalance = async (req, res) => {
     const logId = await generateUUIDv7();
@@ -233,7 +230,7 @@ const updateUserBalanceV2 = async (req, res) => {
     };
 
     const reqTimeDiff = (Date.now() - initTime) / 1000;
-    if(reqTimeDiff > 1) return res.status(500).send({ status: false, msg: 'Request Timed Out!'});
+    if (reqTimeDiff > 1) return res.status(500).send({ status: false, msg: 'Request Timed Out!' });
 
     try {
         const response = await axios(options);
@@ -257,6 +254,5 @@ const updateUserBalanceV2 = async (req, res) => {
         return res.status(500).send({ status: false, msg: err?.response?.data?.message || "Internal Server error" });
     }
 };
-
 
 module.exports = { getUserBalance, updateUserBalance, updateUserBalanceV2 }

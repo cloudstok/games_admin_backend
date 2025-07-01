@@ -19,11 +19,11 @@ const getGameDetails = (req, res) => {
   }
 }
 
-const refreshGameCache = async(req, res) => {
-  try{
-    await loadConfig({ loadGames: true});
+const refreshGameCache = async (req, res) => {
+  try {
+    await loadConfig({ loadGames: true });
     restartQueues();
-    return res.status(200).send({ status: true, msg: 'Cache refresh done'});
+    return res.status(200).send({ status: true, msg: 'Cache refresh done' });
   } catch (err) {
     console.error("Error refreshing cache is:", err);
     return res.status(500).json({ status: false, msg: "Internal server error" });
@@ -64,6 +64,16 @@ const getOperatorGame = async (req, res) => {
   }
 }
 
+const getGameDetailsByUrl = async(req, res) => {
+  try{
+    const url = req.query.rd_url;
+    const [gameDetails] = await read(`SELECT * FROM games_master_list WHERE url = ? or backend_base_url = ?`, [url, url]);
+    return res.status(200).send({ status: true, msg: 'Game details fetched successfully', data: gameDetails});
+  } catch (err) {
+    console.error("Error fetching game details:", err);
+    return res.status(500).json({ status: false, msg: "Internal server error", error: err.message });
+  }
+}
 
 const getOperatorGamesForService = async (req, res) => {
   try {
@@ -196,7 +206,8 @@ const serviceUpdateGame = async (req, res) => {
 
 const getMasterListGames = async (req, res) => {
   try {
-    let { limit = 100, offset = 0 } = req.query;
+    let { limit = 200, offset = 0 } = req.query;
+    limit = 200
     limit = parseInt(limit);
     offset = parseInt(offset);
     if (isNaN(limit) || isNaN(offset)) {
@@ -212,21 +223,21 @@ const getMasterListGames = async (req, res) => {
   }
 }
 
-const validateGameSlug = async(req, res) => {
-  try{
-    const {gameName, slug} = req.body;
-    if(!gameName || !slug) return res.status(400).send({ status: false, msg: 'Missing mandatory parameters'}); 
-    if(slug.length != 7) return res.status(400).send({ status: false, msg: 'Invalid Slug Length'});
-    const isSlugExist = variableConfig.games_masters_list.find(e=> e.game_slug == slug);
-    if(isSlugExist) return res.status(400).send({ status: false, msg: "Slug already selected for another game"});
+const validateGameSlug = async (req, res) => {
+  try {
+    const { gameName, slug } = req.body;
+    if (!gameName || !slug) return res.status(400).send({ status: false, msg: 'Missing mandatory parameters' });
+    if (slug.length != 7) return res.status(400).send({ status: false, msg: 'Invalid Slug Length' });
+    const isSlugExist = variableConfig.games_masters_list.find(e => e.game_slug == slug);
+    if (isSlugExist) return res.status(400).send({ status: false, msg: "Slug already selected for another game" });
     const isSlugValid = validateSlug(slug, gameName);
-    if(isSlugValid) return res.status(200).send({ status: true, msg: 'Slug validated'});
-    else return res.status(400).send({ status: false, msg: 'Slug validation failed'});
+    if (isSlugValid) return res.status(200).send({ status: true, msg: 'Slug validated' });
+    else return res.status(400).send({ status: false, msg: 'Slug validation failed' });
   } catch (err) {
     console.error("Error creating game slug:", err);
     return res.status(500).json({ status: false, msg: "Internal server error", error: err.message });
   }
 }
 
-module.exports = { serviceAddGame, getGameDetails, validateGameSlug, getOperatorGame, getMasterListGames, refreshGameCache, getOperatorGamesForService, addGameForOperator, serviceUpdateGame, getAllGameDetails };
+module.exports = { serviceAddGame, getGameDetails, validateGameSlug, getOperatorGame, getMasterListGames, refreshGameCache, getOperatorGamesForService, addGameForOperator, serviceUpdateGame, getAllGameDetails, getGameDetailsByUrl };
 
