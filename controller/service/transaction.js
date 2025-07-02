@@ -293,6 +293,7 @@ const rollbackBet = async (req, res) => {
             description: rollbackDescription,
             txn_type: 2,
             ip: '',
+            txn_ref_id: debitTxn.txn_id,
             game_id: game_id,
             user_id: user_id,
             game_code: gameData.game_code
