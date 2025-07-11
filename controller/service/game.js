@@ -64,11 +64,11 @@ const getOperatorGame = async (req, res) => {
   }
 }
 
-const getGameDetailsByUrl = async(req, res) => {
-  try{
+const getGameDetailsByUrl = async (req, res) => {
+  try {
     const url = req.query.rd_url;
     const [gameDetails] = await read(`SELECT * FROM games_master_list WHERE url = ? or backend_base_url = ?`, [url, url]);
-    return res.status(200).send({ status: true, msg: 'Game details fetched successfully', data: gameDetails});
+    return res.status(200).send({ status: true, msg: 'Game details fetched successfully', data: gameDetails });
   } catch (err) {
     console.error("Error fetching game details:", err);
     return res.status(500).json({ status: false, msg: "Internal server error", error: err.message });
@@ -121,10 +121,10 @@ const serviceAddGame = async (req, res) => {
       const data = await uploadImage(req.files)
       image = data?.Location
     }
-    const { name, url, backendUrl, companyName, code, genre, category, slug } = req.body;
+    const { name, url, backendUrl, companyName, code, genre, category, slug, origin, team, type } = req.body;
 
-    const sql = `INSERT IGNORE INTO games_master_list (name, game_category, url , backend_base_url, company_name, game_code, game_slug, genre, image) VALUES (?,?,?,?,?,?,?,?,?)`;
-    await write(sql, [name, category, url, backendUrl, companyName, code, slug, genre, image]);
+    const sql = `INSERT IGNORE INTO games_master_list (name, game_category, url , backend_base_url, company_name, game_code, game_slug, genre, game_origin, game_team, game_type, image) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`;
+    await write(sql, [name, category, url, backendUrl, companyName, code, slug, genre, origin, team, type, image]);
     await loadConfig({ loadGames: true });
     return res.status(200).send({ status: true, msg: "Game added successfully to the master's list" });
   } catch (err) {
@@ -133,57 +133,123 @@ const serviceAddGame = async (req, res) => {
   }
 }
 
+// const serviceUpdateGame = async (req, res) => {
+//   try {
+//     let image = '';
+//     if (req.files && req.files.length > 0) {
+//       const data = await uploadImage(req.files);
+//       image = data?.Location;
+//     }
 
+//     const { game_id, name, url, backendUrl, companyName, code, category, genre, origin, team, type } = req.body;
+
+//     if (!game_id) {
+//       return res.status(400).json({ status: false, msg: "Game ID is required for updating." });
+//     }
+
+//     // Build the SQL query dynamically to update only provided fields
+//     const fieldsToUpdate = [];
+//     const values = [];
+
+//     if (name) {
+//       fieldsToUpdate.push("name = ?");
+//       values.push(name);
+//     }
+//     if (origin) {
+//       fieldsToUpdate.push("game_origin = ?");
+//       values.push(origin);
+//     }
+//     if (team) {
+//       fieldsToUpdate.push("game_team = ?");
+//       values.push(team);
+//     }
+//     if (type) {
+//       fieldsToUpdate.push("game_type = ?");
+//       values.push(type);
+//     }
+//     if (category) {
+//       fieldsToUpdate.push("game_category = ?");
+//       values.push(category);
+//     }
+//     if (genre) {
+//       fieldsToUpdate.push("genre = ?");
+//       values.push(genre);
+//     }
+//     if (url) {
+//       fieldsToUpdate.push("url = ?");
+//       values.push(url);
+//     }
+//     if (backendUrl) {
+//       fieldsToUpdate.push("backend_base_url = ?");
+//       values.push(backendUrl);
+//     }
+//     if (companyName) {
+//       fieldsToUpdate.push("company_name = ?");
+//       values.push(companyName);
+//     }
+//     if (code) {
+//       fieldsToUpdate.push("game_code = ?");
+//       values.push(code);
+//     }
+//     if (image) {
+//       fieldsToUpdate.push("image = ?");
+//       values.push(image);
+//     }
+
+//     if (fieldsToUpdate.length === 0) {
+//       return res.status(400).json({ status: false, msg: "No fields provided to update." });
+//     }
+
+//     values.push(game_id);
+
+//     const sql = `UPDATE games_master_list SET ${fieldsToUpdate.join(", ")} WHERE game_id = ?`;
+//     await write(sql, values);
+//     await loadConfig({ loadGames: true });
+//     return res.status(200).send({ status: true, msg: "Game updated successfully in the master's list" });
+//   } catch (err) {
+//     console.error("Error updating game in master's list:", err);
+//     return res.status(500).json({ status: false, msg: "Internal server error", error: err.message });
+//   }
+// };
 
 const serviceUpdateGame = async (req, res) => {
   try {
     let image = '';
-    if (req.files && req.files.length > 0) {
+
+    if (req.files?.length > 0) {
       const data = await uploadImage(req.files);
-      image = data?.Location;
+      image = data?.Location ?? '';
     }
 
-    const { game_id, name, url, backendUrl, companyName, code, category, genre } = req.body;
+    const game_id = req.body.game_id;
 
     if (!game_id) {
       return res.status(400).json({ status: false, msg: "Game ID is required for updating." });
     }
 
-    // Build the SQL query dynamically to update only provided fields
+    const fieldMap = {
+      name: "name",
+      origin: "game_origin",
+      team: "game_team",
+      type: "game_type",
+      category: "game_category",
+      genre: "genre",
+      url: "url",
+      backendUrl: "backend_base_url",
+      companyName: "company_name",
+      code: "game_code",
+      image: "image"
+    };
+
     const fieldsToUpdate = [];
     const values = [];
 
-    if (name) {
-      fieldsToUpdate.push("name = ?");
-      values.push(name);
-    }
-    if (category) {
-      fieldsToUpdate.push("game_category = ?");
-      values.push(category);
-    }
-    if (genre) {
-      fieldsToUpdate.push("genre = ?");
-      values.push(genre);
-    }
-    if (url) {
-      fieldsToUpdate.push("url = ?");
-      values.push(url);
-    }
-    if (backendUrl) {
-      fieldsToUpdate.push("backend_base_url = ?");
-      values.push(backendUrl);
-    }
-    if (companyName) {
-      fieldsToUpdate.push("company_name = ?");
-      values.push(companyName);
-    }
-    if (code) {
-      fieldsToUpdate.push("game_code = ?");
-      values.push(code);
-    }
-    if (image) {
-      fieldsToUpdate.push("image = ?");
-      values.push(image);
+    for (const [key, dbField] of Object.entries(fieldMap)) {
+      const value = key === "image" ? image : req.body[key];
+      if (value) {
+        fieldsToUpdate.push(`${dbField} = ?`);
+        values.push(value);
+      }
     }
 
     if (fieldsToUpdate.length === 0) {
@@ -195,13 +261,18 @@ const serviceUpdateGame = async (req, res) => {
     const sql = `UPDATE games_master_list SET ${fieldsToUpdate.join(", ")} WHERE game_id = ?`;
     await write(sql, values);
     await loadConfig({ loadGames: true });
-    return res.status(200).send({ status: true, msg: "Game updated successfully in the master's list" });
+
+    return res.status(200).json({ status: true, msg: "Game updated successfully in the master's list" });
+
   } catch (err) {
     console.error("Error updating game in master's list:", err);
-    return res.status(500).json({ status: false, msg: "Internal server error", error: err.message });
+    return res.status(500).json({
+      status: false,
+      msg: "Internal server error",
+      error: err.message
+    });
   }
 };
-
 
 
 const getMasterListGames = async (req, res) => {

@@ -159,5 +159,7 @@ CREATE TABLE user_credentials (
 );
 
 
+ALTER table games_master_list ADD COLUMN game_origin enum('pure copy', 'logic copy', 'new concept', 'logic and new concept') default null after `genre`, ADD COLUMN game_team enum('Bangalore', 'Jaipur') default null after `game_origin`, ADD COLUMN game_type enum('Single Player', 'Single Player Mini', 'Multiplayer', 'Multiplayer Mini') default null after `game_team`; 
+
 
 -- ALTER TABLE operator  MODIFY user_type ENUM('agent', 'admin', 'operator') DEFAULT 'agent';
