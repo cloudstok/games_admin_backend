@@ -68,8 +68,8 @@ const operatorFindGame = async (req, res) => {
         }
         const sql = `SELECT * FROM operator_games AS og  INNER JOIN games_master_list AS gml  ON gml.game_id = og.game_id  WHERE operator_id = ? and og.is_active = 1 and gml.genre = ?`;
         const [gamesList] = await read(sql, [operatorId, genre]);
-        if(genre == 'mini'){
-            gamesList.map(game=> {
+        if (genre == 'mini') {
+            gamesList.map(game => {
                 game.count = Math.floor(Math.random() * (200 - 50 + 1)) + 50;
             })
         }
@@ -101,7 +101,7 @@ const operatorGameCodes = async (req, res) => {
         }
         const sql = `SELECT game_code FROM operator_games AS og  INNER JOIN games_master_list AS gml  ON gml.game_id = og.game_id  WHERE operator_id = ? and og.is_active = 1`;
         const [gamesList] = await read(sql, [operatorId]);
-        const finalData = gamesList.map(e=> e.game_code);
+        const finalData = gamesList.map(e => e.game_code);
         await setRedis(`OPGM:${operatorId}`, JSON.stringify(finalData), 60);
         return res.status(200).send({ status: true, msg: 'Games codes fetched successfully', data: finalData });
     } catch (err) {

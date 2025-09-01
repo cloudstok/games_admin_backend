@@ -170,12 +170,12 @@ const voidBet = async (req, res) => {
         if (creditTxn.txn_status != '2') return res.status(400).send({ status: false, msg: 'Credit transaction failed initally' });
         let { user_id, operator_id, session_token, game_id, lobby_id } = creditTxn;
         const [[existingVoidTrax]] = await read(`SELECT * FROM transaction WHERE txn_ref_id = ?`, [creditTxn.txn_id]);
-        if(existingVoidTrax && existingVoidTrax.txn_status == '2') return res.status(400).send({ status: false, msg: "Bet already voided for the given txn"});
+        if (existingVoidTrax && existingVoidTrax.txn_status == '2') return res.status(400).send({ status: false, msg: "Bet already voided for the given txn" });
         const [[debitTxn]] = await read(`SELECT * FROM transaction WHERE txn_id = ?`, [txnRefId]);
         if (!debitTxn) return res.status(400).send({ status: false, msg: 'Debit transaction not found for this Ref Id' });
         if (debitTxn.txn_status != '2') return res.status(400).send({ status: false, msg: 'Debit Transaction was failed for this Ref Id' });
         const debitAmount = Number(creditTxn.amount - debitTxn.amount).toFixed(2);
-        if(Number(debitAmount) <= 0) return res.status(400).send({ status: false, msg: 'Credit amount is less than Debit Amount'});
+        if (Number(debitAmount) <= 0) return res.status(400).send({ status: false, msg: 'Credit amount is less than Debit Amount' });
 
         let gameData = (variableConfig.games_masters_list.find(e => e.game_id == game_id)) || null;
         if (!gameData || !gameData.game_code) {
@@ -183,9 +183,9 @@ const voidBet = async (req, res) => {
         };
 
         const description = `${debitAmount} debited for voiding ${gameData.name.toLowerCase()} game bet with reference id ${creditTxn.txn_id}`;
-        const operatorData = variableConfig.operator_data.find(e=> e.user_id == operator_id);
+        const operatorData = variableConfig.operator_data.find(e => e.user_id == operator_id);
 
-        if(!operatorData) return res.status(400).send({ status: false, msg: `Operator not found for this transaction`})
+        if (!operatorData) return res.status(400).send({ status: false, msg: `Operator not found for this transaction` })
 
         try {
             operatorUrl = await getWebhookUrl(operator_id, "UPDATE_BALANCE");
@@ -199,10 +199,11 @@ const voidBet = async (req, res) => {
 
         const betData = {
             amount: debitAmount,
-            txn_id: existingVoidTrax ? existingVoidTrax.txn_id : await generateUUIDv7(),
+            txn_id: await generateUUIDv7(),
             description,
-            txn_type: 0,
+            txn_type: 3,
             ip: '',
+            txn_ref_id: creditTxn.txn_id,
             game_id: game_id,
             user_id: user_id,
             game_code: gameData.game_code
@@ -232,7 +233,7 @@ const voidBet = async (req, res) => {
             const response = await axios(options);
             //Inserting Success queries to Database
             thirdPartyLogger.info(JSON.stringify({ req: logDataReq, res: response?.data }));
-            if(!existingVoidTrax) await write("INSERT IGNORE INTO transaction (user_id, game_id, session_token, operator_id, txn_id, amount, lobby_id, txn_ref_id, description, txn_type, txn_status) VALUES (?)", [[user_id, game_id, session_token, operator_id, betData.txn_id, debitAmount, lobby_id, creditTxn.txn_id, description, '0', '2']]);
+            if (!existingVoidTrax) await write("INSERT INTO transaction (user_id, game_id, session_token, operator_id, txn_id, amount, lobby_id, txn_ref_id, description, txn_type, txn_status) VALUES (?)", [[user_id, game_id, session_token, operator_id, betData.txn_id, debitAmount, lobby_id, betData.txn_ref_id, description, '0', '2']]);
             else await write(`UPDATE transaction SET txn_status = '2' WHERE id = ?`, [existingVoidTrax.id]);
             return res.status(200).send({ status: true, msg: 'Bet Voided successfully' });
         } catch (err) {
@@ -244,7 +245,7 @@ const voidBet = async (req, res) => {
                 stack: err.stack
             }
             failedThirdPartyLogger.error(JSON.stringify(objForErr));
-            if(!existingVoidTrax) await write("INSERT IGNORE INTO transaction (user_id, game_id, session_token, operator_id, txn_id, amount, lobby_id, txn_ref_id, description, txn_type, txn_status) VALUES (?)", [[user_id, game_id, session_token, operator_id, betData.txn_id, debitAmount, lobby_id, creditTxn.txn_id, description, '0', '0']]);
+            if (!existingVoidTrax) await write("INSERT INTO transaction (user_id, game_id, session_token, operator_id, txn_id, amount, lobby_id, txn_ref_id, description, txn_type, txn_status) VALUES (?)", [[user_id, game_id, session_token, operator_id, betData.txn_id, debitAmount, lobby_id, betData.txn_ref_id, description, '0', '0']]);
             return res.status(500).send({ status: false, msg: err?.response?.data?.message || "Operator Denied Void Request" });
         }
 
@@ -265,7 +266,7 @@ const rollbackBet = async (req, res) => {
         if (debitTxn.txn_status != '2') return res.status(400).send({ status: false, msg: 'Debit transaction failed initally' });
         let { user_id, operator_id, session_token, game_id, lobby_id, amount, description } = debitTxn;
         const [[existingRollbackTrax]] = await read(`SELECT * FROM transaction WHERE txn_ref_id = ?`, [debitTxn.txn_id]);
-        if(existingRollbackTrax && existingRollbackTrax.txn_status == '2') return res.status(400).send({ status: false, msg: "Bet already rollback-ed for the given txn"});
+        if (existingRollbackTrax && existingRollbackTrax.txn_status == '2') return res.status(400).send({ status: false, msg: "Bet already rollback-ed for the given txn" });
 
         let gameData = (variableConfig.games_masters_list.find(e => e.game_id == game_id)) || null;
         if (!gameData || !gameData.game_code) {
@@ -273,9 +274,9 @@ const rollbackBet = async (req, res) => {
         };
 
         const rollbackDescription = description.replace('debited', 'rollback-ed');
-        const operatorData = variableConfig.operator_data.find(e=> e.user_id == operator_id);
+        const operatorData = variableConfig.operator_data.find(e => e.user_id == operator_id);
 
-        if(!operatorData) return res.status(400).send({ status: false, msg: `Operator not found for this transaction`})
+        if (!operatorData) return res.status(400).send({ status: false, msg: `Operator not found for this transaction` })
 
         try {
             operatorUrl = await getWebhookUrl(operator_id, "UPDATE_BALANCE");
@@ -344,39 +345,39 @@ const rollbackBet = async (req, res) => {
     }
 }
 
-const pndgTxnRetry = async(req, res) => {
+const pndgTxnRetry = async (req, res) => {
     try {
         const { amount, txn_ref_id, ip, game_id, user_id, operatorId, token, description, txn_type } = req.body;
         const txn_id = await generateUUIDv7();
         const lobby_id = description ? getLobbyFromDescription(description) : "";
         const game_code = (variableConfig.games_masters_list.find(e => e.game_id == game_id))?.game_code || null;
- 
+
         if (!game_code) return res.status(400).send({ status: false, msg: `game code not found` });
-    
-    
+
+
         const operatorData = variableConfig.operator_data.find(e => e.user_id == operatorId);
         if (!operatorData) return res.status(400).send({ status: false, msg: `Operator not found for this transaction` });
-    
+
         let encryptedData;
-    
+
         try {
             encryptedData = await encryption({ amount, txn_id, txn_ref_id, description, txn_type, ip, game_id, user_id, game_code }, operatorData.secret);
         } catch (err) {
             return res.status(400).send({ status: false, msg: `Something went wrong!` });
         }
-    
+
         let operatorUrl;
-    
+
         try {
             operatorUrl = await getWebhookUrl(operatorId, "UPDATE_BALANCE");
         } catch (err) {
             return res.status(400).send({ status: false, msg: `Something went wrong!` });
         }
-    
+
         if (!operatorUrl) {
             return res.status(400).send({ status: false, msg: `Operator url not found` });
         }
-    
+
         const postOptions = {
             method: 'POST',
             url: operatorUrl,
