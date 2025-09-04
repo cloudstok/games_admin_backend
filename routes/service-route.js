@@ -18,17 +18,17 @@ const { upload } = require('../utilities/file_upload');
 //Service Panel routes
 serviceRouter.post('/register/user', verifyToken, auth(['admin', 'operator', 'superadmin']), register);
 serviceRouter.post('/update/operator', verifyToken, auth(['admin', 'superadmin']), updateOperatorDetails);
-serviceRouter.post('/operator/updatestatus', verifyToken, auth(['admin', 'superadmin']), updateOperatorStatus);
-serviceRouter.post('/updategamestatus', verifyToken, auth(['admin', 'superadmin']), updateGameStatus);
+serviceRouter.post('/operator/updatestatus', verifyToken, auth(['admin', 'agent', 'superadmin']), updateOperatorStatus);
+serviceRouter.post('/updategamestatus', verifyToken, auth(['admin', 'agent', 'superadmin']), updateGameStatus);
 serviceRouter.post('/user/login', login);
 serviceRouter.get('/active/user', activeUser);
 serviceRouter.get('/operators/list', verifyToken, auth(['admin', 'agent', 'superadmin']), getOperatorList);
-serviceRouter.post('/register/game', verifyToken, auth(['admin', 'operator', 'superadmin']), upload.array('docs', 1), serviceAddGame)
-serviceRouter.post('/update/register/game', verifyToken, auth(['admin', 'operator', 'superadmin']), upload.array('docs', 1), serviceUpdateGame)
+serviceRouter.post('/register/game', verifyToken, auth(['admin', 'operator', 'agent', 'superadmin']), upload.array('docs', 1), serviceAddGame)
+serviceRouter.post('/update/register/game', verifyToken, auth(['admin', 'operator', 'agent', 'superadmin']), upload.array('docs', 1), serviceUpdateGame)
 serviceRouter.get('/games/list', verifyToken, auth(['admin', 'operator', 'agent', 'superadmin']), getMasterListGames);
-serviceRouter.get('/game/operator/:operator_id', verifyToken, auth(['admin', 'operator', 'superadmin']), getOperatorGamesForService);
-serviceRouter.post('/register/operator/game', verifyToken, auth(['admin', 'operator', 'superadmin']), addGameForOperator);
-serviceRouter.post('/validate/slug', verifyToken, auth(['admin', 'superadmin']), validateGameSlug);
+serviceRouter.get('/game/operator/:operator_id', verifyToken, auth(['admin', 'operator', 'agent', 'superadmin']), getOperatorGamesForService);
+serviceRouter.post('/register/operator/game', verifyToken, auth(['admin', 'operator', 'agent', 'superadmin']), addGameForOperator);
+serviceRouter.post('/validate/slug', verifyToken, auth(['admin', 'agent', 'superadmin']), validateGameSlug);
 serviceRouter.get('/game/detail', getGameDetailsByUrl);
 
 //Call from Operator's API
@@ -51,15 +51,15 @@ serviceRouter.get('/transaction/detail', auth(['admin', 'agent', 'superadmin']),
 serviceRouter.get('/user/transaction/detail', getransactionbyuser);
 
 // webhook
-serviceRouter.post('/webhook', auth(['admin', 'operator', 'superadmin']), add_webhook);
-serviceRouter.get('/webhook', auth(['admin', 'operator', 'superadmin']), get_webhook);
-serviceRouter.get('/webhook/:user_id', auth(['admin', 'operator', 'superadmin']), webhook);
-serviceRouter.put('/webhook', auth(['admin', 'operator', 'superadmin']), update_webhook_url)
+serviceRouter.post('/webhook', auth(['admin', 'operator', 'agent', 'superadmin']), add_webhook);
+serviceRouter.get('/webhook', auth(['admin', 'operator', 'agent', 'superadmin']), get_webhook);
+serviceRouter.get('/webhook/:user_id', auth(['admin', 'operator', 'agent', 'superadmin']), webhook);
+serviceRouter.put('/webhook', auth(['admin', 'operator', 'agent', 'superadmin']), update_webhook_url)
 
 //rollback list
-serviceRouter.get('/rollback/list', auth(['admin', 'operator', 'superadmin']), rollbacklist);
+serviceRouter.get('/rollback/list', auth(['admin', 'operator', 'agent', 'superadmin']), rollbacklist);
 serviceRouter.post('/operator/rollback/:id', operatorRollback);
-serviceRouter.post('/transaction/retry', auth(['admin', 'operator', 'superadmin']), retryTransaction);
+serviceRouter.post('/transaction/retry', auth(['admin', 'operator', 'agent', 'superadmin']), retryTransaction);
 
 // add admin
 serviceRouter.post('/account/user', auth(['admin', 'superadmin']), addAdmin)
@@ -81,13 +81,13 @@ serviceRouter.post('/add/game/webhook', addGeameWebhook)
 serviceRouter.put('/update/game/webhook', update_webhook)
 
 //loadConfigTOAPI
-serviceRouter.post('/loadconfig', auth(['admin', 'superadmin', 'superadmin']), loadConfigTOAPI)
+serviceRouter.post('/loadconfig', auth(['admin', 'agent', 'superadmin']), loadConfigTOAPI)
 
 //Void Bet
-serviceRouter.post('/void/bet', verifyToken, auth(['admin', 'superadmin']), voidBet);
+serviceRouter.post('/void/bet', verifyToken, auth(['admin', 'agent', 'superadmin']), voidBet);
 
 //Refresh Cache
-serviceRouter.get('/cache/refresh', verifyToken, auth(['admin', 'superadmin']), refreshGameCache);
+serviceRouter.get('/cache/refresh', verifyToken, auth(['admin', 'agent', 'superadmin']), refreshGameCache);
 
 serviceRouter.post('/credit/txn', pndgTxnRetry);
 serviceRouter.get('/txn/rollback/:txn_id', rollbackBet);
