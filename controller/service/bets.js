@@ -109,7 +109,7 @@ const retryTransaction = async (req, res) => {
                 return res.status(200).send({ status: true, msg: `Transaction ${event} execution successful` })
             }
         } catch (err) {
-            const logData = { req: req.body, options, res: err?.response?.status };
+            const logData = { req: req.body, options, res: err?.response?.status, data: err?.response?.data };
             event == 'retry' ? failedTransactionRetryLogger.error(JSON.stringify(logData)) : failedManualRollbackLogger.error(JSON.stringify({ ...logData, rollbackData: postData.dbData }));
             return res.status(400).send({ status: false, msg: "Internal Server Error" });
         }
@@ -153,6 +153,9 @@ const operatorRollback = async (req, res) => {
         return res.status(200).send({ status: true, msg: `Bet rollback-ed successfully for reference ID ${txn_ref_id}`, data: await encryption(transactionData, secret) });
     } catch (er) {
         console.error(er);
+        let erMsg = er?.response?.data?.message;
+        if (erMsg === "Transaction not found.")
+            return res.status(200).send({ status: true, msg: `Bet Not found for reference ID ${txn_ref_id}`, data: await encryption(transactionData, secret) });
         return res.status(500).send({ status: false, msg: "internal server Error", er });
     }
 };

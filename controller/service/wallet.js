@@ -247,7 +247,12 @@ const updateUserBalanceV2 = async (req, res) => {
             stack: err.stack
         }
         const span = process.tracer.scope().active();
-        span.setTag('error', err);
+
+        span.setTag('error.stack', err.stack);
+        span.setTag('error.message', JSON.stringify(objForErr.res4));
+        span.setTag('error', true); // Mark the span as an error
+        span.finish();
+
         failedThirdPartyLogger.error(JSON.stringify(objForErr));
         await write("INSERT IGNORE INTO transaction (user_id, game_id, session_token, operator_id, txn_id, amount, lobby_id, txn_ref_id, description, txn_type, txn_status) VALUES (?)", [[userId, game_id, token, operatorId, txn_id, amount, lobby_id, txnRefId, description, `${txn_type}`, '0']]);
         await sendToQueue('', 'games_rollback', JSON.stringify({ ...req.body, token, game_code, operatorUrl, secret, operatorId }), 100);

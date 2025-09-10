@@ -15,8 +15,8 @@ const exchange = process.env.AMQP_EXCHANGE_NAME;
 
 let pubChannel, subChannel = null;
 let connected = false;
-const MAX_RETRIES = 10;
-const RETRY_DELAY_MS = 1000;
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 10000;
 const QUEUES = {
     debit: 'debit_queue',
     cashout: 'cashout_queue',

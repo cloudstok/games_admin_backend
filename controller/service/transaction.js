@@ -201,7 +201,7 @@ const voidBet = async (req, res) => {
             amount: debitAmount,
             txn_id: await generateUUIDv7(),
             description,
-            txn_type: 3,
+            txn_type: 0,
             ip: '',
             txn_ref_id: creditTxn.txn_id,
             game_id: game_id,
@@ -336,12 +336,19 @@ const rollbackBet = async (req, res) => {
             }
             failedThirdPartyLogger.error(JSON.stringify(objForErr));
             await write("INSERT IGNORE INTO transaction (user_id, game_id, session_token, operator_id, txn_id, amount, lobby_id, txn_ref_id, description, txn_type, txn_status) VALUES (?)", [[user_id, game_id, session_token, operator_id, betData.txn_id, amount, lobby_id, debitTxn.txn_id, description, '2', '0']]);
+            let erMsg = err?.response?.data?.message;
+            if (erMsg === "Transaction not found.")
+                return res.status(200).send({ status: true, msg: 'Transaction not found.' });
             return res.status(500).send({ status: false, msg: err?.response?.data?.message || "Operator Denied Void Request" });
         }
 
     } catch (err) {
         console.error(`Error:::`, err);
-        return res.status(500).send({ status: false, msg: 'Internal Server Error' });
+        let erMsg = err?.response?.data?.message;
+        if (erMsg === "Transaction not found.")
+            return res.status(200).send({ status: true, msg: `Bet Not found for reference ID ${txn_ref_id}`, data: await encryption(transactionData, secret) });
+
+        return res.status(500).send({ status: false, msg: 'Internal Server Error err', err });
     }
 }
 
@@ -395,11 +402,11 @@ const pndgTxnRetry = async (req, res) => {
             return res.status(200).send({ status: true, msg: 'Credit transaction successful' });
         } catch (err) {
             await write("INSERT IGNORE INTO transaction (user_id, game_id, session_token, operator_id, txn_id, amount, lobby_id, txn_ref_id, description, txn_type, txn_status) VALUES (?)", [[user_id, game_id, token, operatorId, txn_id, amount, lobby_id, txn_ref_id, description, `${txn_type}`, '0']]);
-            return res.status(500).send({ status: false, msg: err?.response?.data?.message || "Internal Server error", options: { amount, txn_id, txn_ref_id, description, txn_type, ip, game_id, user_id, game_code } });
+            return res.status(500).send({ status: false, msg: err?.response?.data?.message || "Internal Server error 398", options: { amount, txn_id, txn_ref_id, description, txn_type, ip, game_id, user_id, game_code } });
         }
     } catch (err) {
         console.error(`Error:::`, err);
-        return res.status(500).send({ status: false, msg: 'Internal Server Error' });
+        return res.status(500).send({ status: false, msg: 'Internal Server Error 402', err });
     }
 }
 
