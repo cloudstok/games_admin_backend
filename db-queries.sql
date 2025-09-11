@@ -161,5 +161,13 @@ CREATE TABLE user_credentials (
 
 ALTER table games_master_list ADD COLUMN game_origin enum('pure copy', 'logic copy', 'new concept', 'logic and new concept') default null after `genre`, ADD COLUMN game_team enum('Bangalore', 'Jaipur') default null after `game_origin`, ADD COLUMN game_type enum('Single Player', 'Single Player Mini', 'Multiplayer', 'Multiplayer Mini') default null after `game_team`; 
 
-
--- ALTER TABLE operator  MODIFY user_type ENUM('agent', 'admin', 'operator') DEFAULT 'agent';
+  CREATE TABLE `games_hourly_money_stats` (
+   `id` int NOT NULL AUTO_INCREMENT,
+   `operator_id` varchar(255) NOT NULL,
+   `game_id` int not NULL,
+   `total_bet_amount` varchar(255) NOT NULL,
+   `total_winnings` varchar(255) NOT NULL,
+   `rtp` varchar(255) DEFAULT NULL,
+   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+   PRIMARY KEY (`id`)
+ ) ENGINE=InnoDB AUTO_INCREMENT=1627 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

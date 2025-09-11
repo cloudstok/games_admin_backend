@@ -225,9 +225,7 @@ const getTransactionForRollback = async (data) => {
         console.log(err);
         return false
     }
-
 }
-
 
 const createOptions = (url, options) => {
     let token = options.token;
@@ -243,42 +241,8 @@ const createOptions = (url, options) => {
         }
     }
     return clientServerOptions
-}
-
-async function getHourlyStats() {
-    try {
-        const StatsSQL = `SELECT game_id, operator_id,
-    SUM(CASE WHEN txn_type = '0' and txn_status = '2' THEN amount ELSE 0 END) AS total_bet_amount,
-    SUM(CASE WHEN txn_type = '1' and txn_status = '2' THEN amount ELSE 0 END) AS total_win_amount,
-    SUM(CASE WHEN txn_type = '2' and txn_status = '2' THEN amount ELSE 0 END) AS total_rollback_amount,
-    COUNT(DISTINCT CASE WHEN txn_ref_id IS NULL THEN txn_id END) as total_bets,
-    count(distinct user_id) as active_users
-FROM transaction WHERE created_at >= (NOW() - INTERVAL 1 HOUR)  GROUP BY game_id, operator_id`;
-        const [statsData] = await read(StatsSQL);
-        return statsData;
-    } catch (err) {
-        console.error(`Err while generating stats is::`, err);
-        return false;
-    }
 };
 
-async function storeHourlyStats() {
-    const statsData = await getHourlyStats();
-    const url = process.env.STATS_BASE_URL + '/games/mis/report';
-    const options = {
-        'url': url,
-        'Content-Type': 'application/json',
-        'method': 'POST',
-        'data': statsData
-    };
-
-    try {
-        await axios(options);
-        console.log(`Stats generated and stored successfully`);
-    } catch (error) {
-        console.error('Error fetching data:', error.message);
-    }
-};
 
 const getLobbyFromDescription = (line) => {
     const parts = line.trim().split(' ');
@@ -310,7 +274,17 @@ function validateSlug(slug, gameName) {
         }
         return slugIndex === cleanSlug.length;
     }
-}
+};
+
+function removeNullValues(obj) {
+    const filteredObj = {};
+    for (const key in obj) {
+        if (obj[key] !== null && obj[key] !== undefined && obj[key] !== 'null') {
+            filteredObj[key] = obj[key];
+        }
+    }
+    return filteredObj;
+};
 
 
-module.exports = { validateSlug, generateRandomString, generateRandomUserId, generateUUID, generateUUIDv7, getWebhookUrl, createOptions, getRollbackOptions, getTransactionOptions, storeHourlyStats, getTransactionForRollback, getLobbyFromDescription, restartQueues }
+module.exports = { validateSlug, generateRandomString, generateRandomUserId, generateUUID, generateUUIDv7, getWebhookUrl, createOptions, getRollbackOptions, getTransactionOptions, getTransactionForRollback, getLobbyFromDescription, restartQueues, removeNullValues }

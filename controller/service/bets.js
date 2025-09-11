@@ -9,70 +9,6 @@ const manualRollbackLogger = createLogger('manualRollback', 'jsonl');
 const failedTransactionRetryLogger = createLogger('failedTransactionRetry', 'jsonl');
 const failedManualRollbackLogger = createLogger('failedManualRollback', 'jsonl');
 
-// Get Bets from Game
-const bets = async (req, res) => {
-    try {
-        req.query.game = req.query.game.replace(' ', '_');
-        const token = req.headers.authorization;
-        const data = await fetchAllBets(req.query, token);
-        return res.status(200).send({ status: true, msg: "data found", data: data.data })
-    } catch (er) {
-        console.error(er);
-        return res.status(500).send({ status: false, msg: "internal server Error", er })
-    }
-}
-async function fetchAllBets(data, token) {
-    const params = { ...data };
-    const url = process.env.STATS_BASE_URL + `/${params.game}/all/bets`;
-    delete params.game;
-    try {
-        const response = await axios.get(url, {
-            params,
-            headers: {
-                Authorization: token // Include token in the headers
-            }
-        });
-        return response.data;
-    } catch (error) {
-        console.error(error?.response?.data);
-    }
-}
-
-
-function removeNullValues(obj) {
-    const filteredObj = {};
-    for (const key in obj) {
-        if (obj[key] !== null && obj[key] !== undefined && obj[key] !== 'null') {
-            filteredObj[key] = obj[key]; // Keep the key-value pair
-        }
-    }
-
-    return filteredObj; // Return the new object with null values removed
-}
-const report = async (req, res) => {
-    try {
-        req.query.game = req.query.game.replace(' ', '_');
-        const data = await fetchAllreport(removeNullValues(req.query));
-        return res.status(200).send({ status: true, msg: "data found", data })
-    } catch (er) {
-        return res.status(500).send({ status: false, msg: "internal server Error" })
-    }
-}
-
-async function fetchAllreport(data) {
-    const params = { ...data };
-    const url = process.env.STATS_BASE_URL + `/${params.game}/mis/report`;
-    delete params.game;
-    const queryString = new URLSearchParams(params).toString();
-    const fullUrl = queryString ? `${url}?${queryString}` : url; // Append query string if params exist
-    try {
-        const response = await axios.get(fullUrl);
-        return response.data.data;
-    } catch (error) {
-        console.error(error?.response?.data);
-    }
-}
-
 async function executeTransactionQuery(responseData, requestData) {
     try {
         if (requestData.txn_status == '0' && requestData.event == 'retry') {
@@ -163,8 +99,7 @@ const operatorRollback = async (req, res) => {
 const insertRollbackData = async (userId, token, operatorId, transactionId, rollbackAmount, txn_ref_id, description, game_id) => {
     const lobby_id = description ? getLobbyFromDescription(description) : "";
     await write(`INSERT IGNORE INTO transaction (user_id, game_id, session_token, operator_id, txn_id, amount, lobby_id, txn_ref_id, description, txn_type, txn_status) VALUES (?)`, [[userId, game_id, token, operatorId, transactionId, rollbackAmount, lobby_id, txn_ref_id, description, '2', '2']])
-}
-
+};
 
 const getOperator = async (operatorId) => {
     try {
@@ -186,5 +121,4 @@ const getPendingTransaction = async (txn_ref_id) => {
     }
 };
 
-
-module.exports = { bets, operatorRollback, retryTransaction, report }
+module.exports = { operatorRollback, retryTransaction }

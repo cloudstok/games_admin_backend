@@ -7,12 +7,13 @@ const { activeUser, getUserDetail } = require('../controller/service/user');
 const { getransaction, rollbacklist, getransactionbyuser, voidBet, pndgTxnRetry, rollbackBet } = require('../controller/service/transaction');
 const serviceRouter = require('express').Router();
 const { add_webhook, get_webhook, webhook, update_webhook_url } = require('../controller/service/webhook');
-const { bets, retryTransaction, operatorRollback, report } = require('../controller/service/bets');
+const { retryTransaction, operatorRollback } = require('../controller/service/bets');
 const { addAgent, agentList, agentChangePassword, deleteAgent, resetAgentPassword } = require('../controller/service/agent');
 const { addAdmin, adminList, adminChangePassword, deleteAdmin } = require('../controller/service/admin');
 const { loadConfigTOAPI } = require('../utilities/load-config');
 const { getGeameWebhook, addGeameWebhook, update_webhook } = require('../controller/operator/game');
 const { upload } = require('../utilities/file_upload');
+const { fetchReport } = require('../controller/reports/mis-reports');
 
 
 //Service Panel routes
@@ -45,8 +46,7 @@ serviceRouter.get('/all/games', getAllGameDetails);
 serviceRouter.post('/operator/user/balance/v2', updateUserBalanceV2);
 serviceRouter.get('/user/detail', getUserDetail);
 
-// bets 
-serviceRouter.get('/bets', auth(['admin', 'agent', 'superadmin']), bets)
+
 serviceRouter.get('/transaction/detail', auth(['admin', 'agent', 'superadmin']), getransaction);
 serviceRouter.get('/user/transaction/detail', getransactionbyuser);
 
@@ -75,7 +75,7 @@ serviceRouter.post('/agent/change/password', auth(['agent', 'admin', 'superadmin
 serviceRouter.post('/agent/reset/password', verifyToken, auth(['admin', 'superadmin']), resetAgentPassword);
 
 // report
-serviceRouter.get('/mis/report', auth(['admin', 'superadmin']), report)
+serviceRouter.get('/mis/report', auth(['admin', 'superadmin']), fetchReport)
 serviceRouter.get('/get/game/webhook', getGeameWebhook)
 serviceRouter.post('/add/game/webhook', addGeameWebhook)
 serviceRouter.put('/update/game/webhook', update_webhook)
