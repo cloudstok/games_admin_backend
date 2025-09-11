@@ -80,7 +80,7 @@ const fetchReport = async (req, res) => {
             cacheKey = `c5-${number}-${unit}-${operator_id}-${game_id}`;
         }
         let statsCache = await getRedis(cacheKey);
-        if (!statsCache) {
+        if (statsCache) {
             statsCache = JSON.parse(statsCache);
             return res.status(200).send({ status: true, msg: "data found", data: statsCache });
         } else {
@@ -97,7 +97,6 @@ const fetchReport = async (req, res) => {
             if (cacheKey && statsData) {
                 await setRedis(cacheKey, JSON.stringify(statsData), 3600); // Cache for 1 hour (3600 seconds)
             }
-            console.log("2__>>", statsData);
             return res.status(200).send({ status: true, msg: "data found", data: statsData });
         }
     } catch (err) {
